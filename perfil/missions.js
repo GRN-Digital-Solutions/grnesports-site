@@ -343,11 +343,24 @@ export function abrirPainelConquistas() {
       // Mostrar claim se pending OU se completo mas ainda não marcado
       const showClaim = pending || (isAtivo && completo);
 
-      const rewardStr = [
-        tier.reward.xp   ? `+${tier.reward.xp} Trainer XP` : '',
-        ...Object.entries(tier.reward.itens || {}).map(([k, v]) => `+${v} ${_itemLabel(k)}`),
-        tier.reward.cosmetic ? `🎨 ${COSMETICS[tier.reward.cosmetic]?.label || tier.reward.cosmetic}` : '',
-      ].filter(Boolean).join(' · ');
+      const rewardChips = (() => {
+        const parts = [];
+        if (tier.reward.xp) {
+          parts.push(`<span class="mss-reward-chip mss-reward-xp">⭐ +${tier.reward.xp} XP</span>`);
+        }
+        Object.entries(tier.reward.itens || {}).forEach(([k, v]) => {
+          parts.push(`<span class="mss-reward-chip">
+            <img src="/boss/img-items/${k}.png" class="mss-reward-img" onerror="this.style.display='none'">
+            <span class="mss-reward-qty">×${v}</span>
+            <span class="mss-reward-name">${_itemLabel(k)}</span>
+          </span>`);
+        });
+        if (tier.reward.cosmetic) {
+          const c = COSMETICS[tier.reward.cosmetic];
+          parts.push(`<span class="mss-reward-chip mss-reward-cosmetic">${c?.preview || '🎨'} ${c?.label || tier.reward.cosmetic}</span>`);
+        }
+        return parts.join('');
+      })();
 
       let cls = 'mss-tier-locked';
       if (done)           cls = 'mss-tier-done';
@@ -361,7 +374,7 @@ export function abrirPainelConquistas() {
             <span class="mss-tier-target">${done ? '✔ Claimed' : showClaim ? '🎁 Ready!' : `${progresso} / ${tier.target}`}</span>
           </div>
           ${isAtivo && !completo ? `<div class="mss-tier-bar-bg"><div class="mss-tier-bar-fill" style="width:${pct}%"></div></div>` : ''}
-          <div class="mss-tier-reward">${rewardStr}</div>
+          <div class="mss-tier-reward">${rewardChips}</div>
           ${showClaim ? `<button class="mss-claim-btn" data-ach-id="${achId}" data-tier="${tier.tier}">🎁 Claim Reward</button>` : ''}
         </div>`;
     }).join('');

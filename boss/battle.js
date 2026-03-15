@@ -214,6 +214,9 @@ const MOVES_DB = {
   encore:        {name:'Encore',        type:'normal',  cat:'status',   power:null,acc:100, pp:5},
   retaliate:     {name:'Retaliate',     type:'normal',  cat:'physical', power:70,  acc:100, pp:5},
   slash:         {name:'Slash',         type:'normal',  cat:'physical', power:70,  acc:100, pp:20},
+  // ── Explosion moves — bloqueados pela ability Damp ──────────────────
+  explosion:     {name:'Explosion',     type:'normal',  cat:'physical', power:250, acc:100, pp:5,  effect:'explosion'},
+  self_destruct: {name:'Self-Destruct', type:'normal',  cat:'physical', power:200, acc:100, pp:5,  effect:'explosion'},
 };
 
 const TIPO_CORES = {
@@ -257,7 +260,20 @@ function calcularDrops(bossNivel, bossNome='') {
   // ── Drops específicos por boss (raros) ──────────────────
   const bossSpecific = {};
   if (bossNome === 'bulbasaur') {
-    if (Math.random() < 0.08) bossSpecific['leaf_stone'] = 1; // 8% — raro
+    if (Math.random() < 0.08) bossSpecific['leaf_stone']  = 1; // 8% — raro
+    if (Math.random() < 0.08) bossSpecific['wise_glasses'] = 1; // 8% — held item
+  }
+  if (bossNome === 'spinarak') {
+    if (Math.random() < 0.08) bossSpecific['insect_plate'] = 1; // 8% — held item
+  }
+  if (bossNome === 'wooloo') {
+    if (Math.random() < 0.08) bossSpecific['silk_scarf'] = 1; // 8% — held item
+  }
+  if (bossNome === 'caterpie') {
+    if (Math.random() < 0.08) bossSpecific['white_herb'] = 1; // 8% — held item
+  }
+  if (bossNome === 'weedle') {
+    if (Math.random() < 0.08) bossSpecific['silver_powder'] = 1; // 8% — held item
   }
   // Para novos bosses: adicionar aqui ex:
   // if (bossNome === 'oddish') { if (Math.random() < 0.06) bossSpecific['leaf_stone'] = 1; }
@@ -608,13 +624,13 @@ function golpesAteNivelBattle(pokemon, nivel) {
 // ── Ability mínima para pokémons capturados em boss raid ────────────
 // Tabela de abilities dos bosses disponíveis no BOSS_CONFIG
 const BOSS_ABILITIES = {
-  caterpie: { normal: ['shield_dust','run_away'], hidden: 'run_away' },
-  metapod:  { normal: ['shed_skin'],              hidden: null        },  // shed skin only
-  kakuna:   { normal: ['shed_skin'],              hidden: null        },  // shed skin only
-  staryu:   { normal: ['illuminate','natural_cure'], hidden: 'analytic' },
-  mawile:   { normal: ['hyper_cutter','intimidate'], hidden: 'sheer_force' },
-  spinarak: { normal: ['swarm','insomnia'],        hidden: 'sniper'   },  // swarm, not shed_skin
-  weedle:   { normal: ['run_away'],                hidden: 'sniper'   },
+  caterpie: { normal: ['shield_dust','run_away'], hidden: 'run_away'      },
+  metapod:  { normal: ['shed_skin'],              hidden: null             },
+  kakuna:   { normal: ['shed_skin'],              hidden: null             },
+  staryu:   { normal: ['illuminate','natural_cure'], hidden: 'analytic'   },
+  mawile:   { normal: ['hyper_cutter','intimidate'], hidden: 'sheer_force'},
+  spinarak: { normal: ['swarm','insomnia'],        hidden: 'sniper'       },
+  weedle:   { normal: ['run_away'],                hidden: 'sniper'       },
   wooloo:   { normal: ['fluffy','run_away'],        hidden: 'bulletproof' },
 };
 function gerarAbilityBoss(pokemon) {
@@ -1064,13 +1080,15 @@ async function atualizarHPPlayer(){
 
   await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), {
     hpMax, hp: hpAtual, pokemon: pokeName, nivel: pokemonSlot.nivel||1,
+    slot: pokemonSlot.slot || null,          // ← slot para lookup preciso no mostrarDrops
     ivs: pokemonSlot.ivs||{}, evs: pokemonSlot.evs||{},
     nature: pokemonSlot.nature||'Hardy',
     golpes,
     ppAtual: ppInicial,
-    shiny: pokemonSlot.shiny === true,   // ← propaga shiny para o RTDB
-    ability: pokemonSlot.ability || '',  // ← propaga ability também (já usada em btUsarGolpe)
-    status: pokemonSlot.status || null,  // ← status persistido (poison etc)
+    shiny: pokemonSlot.shiny === true,
+    ability: pokemonSlot.ability || '',
+    heldItem: pokemonSlot.heldItem || null,
+    status: pokemonSlot.status || null,
     fainted: pokemonSlot.fainted === true,
   });
 }
@@ -1100,65 +1118,103 @@ async function processarStatusDanoPlayer() {
   if (!me || me.fainted || me.hp <= 0) return;
   const status = me.status;
   if (status !== 'poison' && status !== 'toxic' && status !== 'burn') return;
-
-  // ── Shed Skin: 30% chance de curar status antes do dano ──────────────
-  // Funciona para poison, toxic e burn
   if (me.ability === 'shed_skin' && Math.random() < 0.30) {
-    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), {
-      status:     null,
-      toxicTurns: 0,
-    });
+    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { status: null, toxicTurns: 0 });
     showPlayerFloat(_uid, '✨ Shed Skin!', 'heal');
     await logAction(`${getNick()}'s ${cap(me.pokemon)}'s Shed Skin cured its ${status}!`);
-    return; // curado — sem dano
+    return;
   }
-
-  let dmg = 0;
-  let msg = '';
-  const hpMax = me.hpMax || 1;
-  const pName = cap(me.pokemon);
-
-  if (status === 'poison') {
-    dmg = Math.max(1, Math.floor(hpMax / 8));
-    msg = `${getNick()}'s ${pName} is hurt by poison! (-${dmg} HP)`;
-  } else if (status === 'toxic') {
-    const toxTurn = (me.toxicTurns || 0) + 1;
-    dmg = Math.max(1, Math.floor(hpMax / 16 * toxTurn));
-    msg = `${getNick()}'s ${pName} is badly hurt by poison! (-${dmg} HP)`;
-    await update(_battleRef, { [`players/${_uid}/toxicTurns`]: toxTurn });
-  } else if (status === 'burn') {
-    dmg = Math.max(1, Math.floor(hpMax / 8));
-    msg = `${getNick()}'s ${pName} is hurt by its burn! (-${dmg} HP)`;
-  }
-
+  let dmg = 0; let msg = '';
+  const hpMax = me.hpMax || 1; const pName = cap(me.pokemon);
+  if (status === 'poison') { dmg = Math.max(1, Math.floor(hpMax / 8)); msg = `${getNick()}'s ${pName} is hurt by poison! (-${dmg} HP)`; }
+  else if (status === 'toxic') { const toxTurn = (me.toxicTurns||0)+1; dmg = Math.max(1, Math.floor(hpMax/16*toxTurn)); msg = `${getNick()}'s ${pName} is badly hurt by poison! (-${dmg} HP)`; await update(_battleRef, { [`players/${_uid}/toxicTurns`]: toxTurn }); }
+  else if (status === 'burn') { dmg = Math.max(1, Math.floor(hpMax / 8)); msg = `${getNick()}'s ${pName} is hurt by its burn! (-${dmg} HP)`; }
   const newHp = Math.max(0, me.hp - dmg);
   await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: newHp });
   showPlayerFloat(_uid, `-${dmg}`, 'super');
   await logAction(msg);
-
   if (newHp <= 0) {
-    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), {
-      hp: 0, fainted: true,
-    });
+    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: 0, fainted: true });
     await logAction(`${getNick()}'s ${pName} fainted from ${status}!`);
   }
 }
 
-// ── Processar turno de sleep (async, chamado pelo renderBattle) ──
+// ── Held Item: efeitos de fim de turno (Leftovers, etc.) ─────
+async function processarHeldItemEndTurn() {
+  const me = _battleSnap?.players?.[_uid];
+  if (!me || me.fainted || me.hp <= 0 || !me.heldItem) return;
+
+  const heldItem = me.heldItem;
+  const hpMax    = me.hpMax || 1;
+  const pName    = cap(me.pokemon);
+
+  // Leftovers: recupera 1/16 do HP máximo por turno
+  if (heldItem === 'leftovers') {
+    if (me.hp < hpMax) {
+      const heal = Math.max(1, Math.floor(hpMax / 16));
+      const newHp = Math.min(hpMax, me.hp + heal);
+      await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: newHp });
+      showPlayerFloat(_uid, `+${heal}`, 'heal');
+      await logAction(`${getNick()}'s ${pName}'s Leftovers restored ${heal} HP!`);
+    }
+    return;
+  }
+
+  // Lum Berry: cura qualquer status uma vez e é consumida
+  if (heldItem === 'lum_berry' && me.status) {
+    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), {
+      status: null, sleepTurns: 0, toxicTurns: 0, heldItem: null,
+    });
+    showPlayerFloat(_uid, '✨ Lum Berry!', 'heal');
+    await logAction(`${getNick()}'s ${pName}'s Lum Berry cured its ${me.status}!`);
+    // Persistir remoção do item no Firestore
+    try {
+      const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+      const novoTeam = (_userData?.raidTeam || []).map(s =>
+        s.pokemon === me.pokemon ? { ...s, heldItem: null } : s
+      );
+      await updateDoc(doc(fsdb, 'usuarios', _uid), { raidTeam: JSON.parse(JSON.stringify(novoTeam)) });
+      if (_userData) _userData.raidTeam = novoTeam;
+    } catch(e) { console.warn('[heldItem] lum berry save:', e); }
+  }
+
+  // White Herb: restaura o primeiro stat rebaixado e é consumida
+  if (heldItem === 'white_herb') {
+    const stages = _playerStages[_uid] || {};
+    const hasDebuff = Object.values(stages).some(v => v < 0);
+    if (hasDebuff) {
+      // Restaurar todos os stages negativos para 0
+      const restored = {};
+      Object.entries(stages).forEach(([k, v]) => { if (v < 0) restored[k] = 0; });
+      _playerStages[_uid] = { ...stages, ...restored };
+      await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), {
+        statStages: _playerStages[_uid], heldItem: null,
+      });
+      showPlayerFloat(_uid, '🌿 White Herb!', 'heal');
+      await logAction(`${getNick()}'s ${pName}'s White Herb restored lowered stats!`);
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+        const novoTeam = (_userData?.raidTeam || []).map(s =>
+          s.pokemon === me.pokemon ? { ...s, heldItem: null } : s
+        );
+        await updateDoc(doc(fsdb, 'usuarios', _uid), { raidTeam: JSON.parse(JSON.stringify(novoTeam)) });
+        if (_userData) _userData.raidTeam = novoTeam;
+      } catch(e) { console.warn('[heldItem] white herb save:', e); }
+    }
+  }
+}
 async function processarSleepTurno(playerSnap) {
   const sleepTurns = playerSnap?.sleepTurns ?? 0;
   const remaining  = sleepTurns - 1;
+  const pName      = cap(playerSnap.pokemon);
   if (remaining <= 0) {
-    await update(_battleRef, {
-      [`players/${_uid}/status`]:     null,
-      [`players/${_uid}/sleepTurns`]: 0,
-    });
-    await logAction(`${getNick()}'s ${cap(playerSnap.pokemon)} woke up!`);
+    await update(_battleRef, { [`players/${_uid}/status`]: null, [`players/${_uid}/sleepTurns`]: 0 });
+    await logAction(`${getNick()}'s ${pName} woke up!`);
   } else {
-    await update(_battleRef, {
-      [`players/${_uid}/sleepTurns`]: remaining,
-    });
-    await logAction(`${getNick()}'s ${cap(playerSnap.pokemon)} is fast asleep! 💤`);
+    await update(_battleRef, { [`players/${_uid}/sleepTurns`]: remaining });
+    showPlayerFloat(_uid, '💤', 'miss');
+    await logAction(`${getNick()}'s ${pName} is fast asleep! 💤`);
+    await new Promise(res => setTimeout(res, 3000));
   }
   await avancarTurno();
 }
@@ -1491,13 +1547,15 @@ function renderPlayers(bs){
 function atualizarBotoes(bs){
   const me      = bs.players?.[_uid];
   const fainted = me?.fainted || me?.hp <= 0;
-  const myTurn  = _myTurn && !_actionDone && !fainted;
 
-  const bs_atualizar = _battleSnap;
-  const capture_fase = bs_atualizar?.fase === 'capture';
+  const bs_atualizar   = _battleSnap;
+  const capture_fase   = bs_atualizar?.fase === 'capture';
   const captureQueue_a = bs_atualizar?.captureQueue || [];
   const captureQIdx_a  = bs_atualizar?.captureQueueIdx || 0;
-  const myCaptureTurn = capture_fase && captureQueue_a[captureQIdx_a] === _uid;
+  const myCaptureTurn  = capture_fase && captureQueue_a[captureQIdx_a] === _uid;
+
+  // Durante captura, pokémons fainted ainda podem arremessar
+  const myTurn = _myTurn && !_actionDone && (!fainted || capture_fase);
 
   const bossTurnLock = !!_battleSnap?.bossTurnActive || _bossAttacking;
   document.getElementById('btnFight').disabled = bossTurnLock || !myTurn || _capturePhase;
@@ -1851,8 +1909,19 @@ window.btUsarGolpe = async function(idx, moveKey){
   // Montar move
   const MOVES_LIGHT = getMoveLight(moveKey);
   // Fallback: se o golpe não está no MOVES_DB, trata como status (sem dano)
-  // para não causar dano acidental em golpes desconhecidos
   const move = MOVES_LIGHT || { name: cap(moveKey.replace(/_/g,' ')), type:'normal', cat:'status', power:null, acc:100 };
+
+  // ── Damp: bloqueia golpes de explosão ─────────────────────────
+  // Agora move já está declarado — verificação segura
+  if (move.effect === 'explosion') {
+    const allPlayers = _battleSnap?.players || {};
+    const dampUser = Object.values(allPlayers).find(p => p.ability === 'damp' && !p.fainted && p.hp > 0);
+    if (dampUser) {
+      await logAction(`${cap(dampUser.pokemon)}'s Damp prevents the use of ${move.name}!`);
+      _actionDone = false;
+      return;
+    }
+  }
 
   // Checar accuracy
   const hit = !move.acc || Math.random() * 100 <= move.acc; // false ou null = sempre acerta
@@ -1932,6 +2001,7 @@ window.btUsarGolpe = async function(idx, moveKey){
 
     await logAction(`${getNick()}'s ${cap(me.pokemon)} used ${move.name}!${logExtra}`);
     await processarStatusDanoPlayer();
+    await processarHeldItemEndTurn();
     await avancarTurno();
     return;
   }
@@ -1953,7 +2023,23 @@ window.btUsarGolpe = async function(idx, moveKey){
   const bossStatsEff = { ..._bossStats, def: move.cat==='physical'?bossDefEff:_bossStats.def, spd: move.cat==='special'?bossDefEff:_bossStats.spd };
   const res      = calcDano(myStatsEff, bossStatsEff, move, pokeTipos, bossTipos, me.nivel||1);
 
-  const dano     = Math.min(res.dmg, bossHp); // não vai abaixo de 0
+  // ── Life Orb: +30% dano, custa 1/10 HP por ataque ────────────
+  const hasLifeOrb = me.heldItem === 'life_orb';
+
+  // ── Held Items de power boost ──────────────────────────────
+  // Insect Plate / Silver Powder: +20% em golpes Bug
+  // Silk Scarf: +20% em golpes Normal
+  // Wise Glasses: +10% em golpes Special
+  let heldBoostMult = 1.0;
+  if (move.power && res.eff > 0) {
+    const heldItem = me.heldItem;
+    if ((heldItem === 'insect_plate' || heldItem === 'silver_powder') && move.type === 'bug')    heldBoostMult = 1.20;
+    else if (heldItem === 'silk_scarf'  && move.type === 'normal')   heldBoostMult = 1.20;
+    else if (heldItem === 'wise_glasses' && move.cat === 'special')  heldBoostMult = 1.10;
+  }
+  const lifeOrbMult = hasLifeOrb ? 1.3 : 1.0;
+
+  const dano     = Math.min(Math.floor(res.dmg * lifeOrbMult * heldBoostMult), bossHp);
   const newBossHp= Math.max(0, bossHp - dano);
 
   // Float de dano
@@ -2015,6 +2101,30 @@ window.btUsarGolpe = async function(idx, moveKey){
     }
   }
 
+  // ── Shell Bell: cura 1/8 do dano causado ──────────────────────
+  if (me.heldItem === 'shell_bell' && dano > 0 && res.eff > 0) {
+    const myHpNow = _battleSnap.players?.[_uid]?.hp ?? 0;
+    const myHpMax = _battleSnap.players?.[_uid]?.hpMax ?? 1;
+    const shellHeal = Math.max(1, Math.floor(dano / 8));
+    if (myHpNow < myHpMax) {
+      const healedHp = Math.min(myHpMax, myHpNow + shellHeal);
+      await update(_battleRef, { [`players/${_uid}/hp`]: healedHp });
+      showPlayerFloat(_uid, `+${shellHeal}`, 'heal');
+      logTxt += ` Shell Bell restored ${shellHeal} HP!`;
+    }
+  }
+
+  // ── Life Orb: custa 1/10 do HP máximo após o ataque ───────────
+  if (hasLifeOrb && res.eff > 0 && dano > 0) {
+    const myHpNow = _battleSnap.players?.[_uid]?.hp ?? 0;
+    const myHpMax = _battleSnap.players?.[_uid]?.hpMax ?? 1;
+    const orbCost = Math.max(1, Math.floor(myHpMax / 10));
+    const afterOrb = Math.max(1, myHpNow - orbCost); // não mata por Life Orb
+    await update(_battleRef, { [`players/${_uid}/hp`]: afterOrb });
+    showPlayerFloat(_uid, `-${orbCost}`, 'super');
+    logTxt += ` Life Orb costs ${orbCost} HP!`;
+  }
+
   // Decrementar PP do golpe usado
   const ppAtualSnap = me.ppAtual || {};
   const ppAntes     = ppAtualSnap[moveKey] !== undefined ? ppAtualSnap[moveKey] : (getMoveLight(moveKey)?.pp || 10);
@@ -2041,6 +2151,7 @@ window.btUsarGolpe = async function(idx, moveKey){
   await logAction(logTxt);
 
   await processarStatusDanoPlayer();
+  await processarHeldItemEndTurn();
   await avancarTurno();
 };
 
@@ -2194,6 +2305,7 @@ window.btUsarItem = async function(itemKey){
   }
 
   await processarStatusDanoPlayer();
+  await processarHeldItemEndTurn();
   await avancarTurno();
 };
 
@@ -2297,6 +2409,7 @@ async function bossAtaca(){
     if (newBossHp <= 0){
       const _turnOrdPoison = bs.turnOrder || [];
       statusUpdates.bossFainted     = true;
+      statusUpdates.bossTurnActive  = false;   // libera o lock para captura
       statusUpdates.fase            = 'capture';
       statusUpdates.captureQueue    = [..._turnOrdPoison];
       statusUpdates.captureQueueIdx = 0;
@@ -2317,6 +2430,7 @@ async function bossAtaca(){
     if (newBossHp <= 0){
       const _turnOrdBurn = bs.turnOrder || [];
       statusUpdates.bossFainted     = true;
+      statusUpdates.bossTurnActive  = false;   // libera o lock para captura
       statusUpdates.fase            = 'capture';
       statusUpdates.captureQueue    = [..._turnOrdBurn];
       statusUpdates.captureQueueIdx = 0;
@@ -2386,6 +2500,18 @@ async function bossAtaca(){
     pool = golpesDisponiveis; // só tem um tipo — sem bias
   }
   const move = pool[Math.floor(Math.random() * pool.length)];
+
+  // ── Damp: bloqueia golpes de explosão do boss ─────────────────────
+  if (move.effect === 'explosion') {
+    const dampUser = Object.values(bs.players || {}).find(p => p.ability === 'damp' && !p.fainted && p.hp > 0);
+    if (dampUser) {
+      await logAction(`${cap(dampUser.pokemon)}'s Damp prevents Boss from using ${move.name}!`);
+      _bossAttacking = false;
+      // Boss "perde" o turno tentando usar o golpe bloqueado
+      await update(_battleRef, { bossTurnActive: false });
+      return;
+    }
+  }
 
   // Targets: single → aleatório entre players vivos; all → todos os players
   const players     = bs.players || {};
@@ -2572,14 +2698,31 @@ async function bossAtaca(){
       spd: getEffStat(playerStats.spd, 'spd', _playerStages[targetUid] || {}),
     };
     const res   = calcBossAtk(bossStatsEff, playerStatsEff, move, bossTipos, playerTipos, _bossData.nivel);
-    const dano  = Math.min(res.dmg, p.hp);
-    const newHp = Math.max(0, p.hp - dano);
+    let dano    = Math.min(res.dmg, p.hp);
+    let newHp   = Math.max(0, p.hp - dano);
+
+    // ── Held Item passives: Focus Band ─────────────────────────
+    if (newHp <= 0 && p.heldItem === 'focus_band' && Math.random() < 0.12) {
+      newHp = 1;
+      dano  = p.hp - 1;
+      logParts.push(`${cap(p.pokemon)}'s Focus Band activated! It survived with 1 HP!`);
+    }
+
     updates[`players/${targetUid}/hp`] = newHp;
     if (newHp <= 0) updates[`players/${targetUid}/fainted`] = true;
 
     showPlayerFloat(targetUid, `-${dano}`);
     logParts.push(`${players[targetUid].nick || 'Player'}'s ${cap(p.pokemon)} took ${dano} damage!`);
     if (res.eff > 1) logParts.push('Super effective!');
+
+    // ── Rocky Helmet: devolve 1/6 HP máx do boss ao atacante por contato ──
+    if (p.heldItem === 'rocky_helmet' && move.cat === 'physical' && dano > 0) {
+      const helmetDmg = Math.max(1, Math.floor(bs.bossHpMax / 6));
+      const curBossHp = updates['bossHp'] ?? bs.bossHp;
+      updates['bossHp'] = Math.max(0, curBossHp - helmetDmg);
+      showBossFloat(`-${helmetDmg}`, 'super');
+      logParts.push(`${cap(p.pokemon)}'s Rocky Helmet hurt the Boss! (-${helmetDmg})`);
+    }
 
     // ── Boss drain (Absorb / Mega Drain / Giga Drain) ─────────────
     const bossDrainFrac = move.drain || 0;
@@ -2938,16 +3081,33 @@ async function mostrarDrops(){
   // ── Salvar itens e pokemon no Firestore ──
   const userData = _userData;
   const raidTeam = userData?.raidTeam || [];
-  // Pokemon que o usuário usou na raid (primeiro slot da equipe ou o escolhido)
+  // Pokemon que o usuário usou na raid — buscar pelo slot registrado no RTDB
   const myBattlePlayer = bs?.players?.[_uid];
-  const myPokeName = myBattlePlayer?.pokemon || raidTeam[0]?.pokemon;
-  const mySlotIdx  = raidTeam.findIndex(s => s.pokemon === myPokeName);
-  let   mySlot     = mySlotIdx >= 0 ? { ...raidTeam[mySlotIdx] } : null;
+  const myPokeName  = myBattlePlayer?.pokemon || raidTeam[0]?.pokemon;
+  // Buscar por slot primeiro (mais preciso), fallback para nome
+  const mySlotNum   = myBattlePlayer?.slot ?? null;
+  const mySlotIdx   = mySlotNum !== null
+    ? raidTeam.findIndex(s => s.slot === mySlotNum)
+    : raidTeam.findIndex(s => s.pokemon === myPokeName);
+  let   mySlot      = mySlotIdx >= 0 ? { ...raidTeam[mySlotIdx] } : null;
+  // Fallback final: se não achou por slot nem por nome, tentar só pelo nome
+  if (!mySlot && myPokeName) {
+    const fbIdx = raidTeam.findIndex(s => s.pokemon === myPokeName);
+    if (fbIdx >= 0) { mySlot = { ...raidTeam[fbIdx] }; }
+  }
 
-  // Adicionar itens à raidBag
-  const newBag = Object.assign({}, userData?.raidBag || {});
+  // Separar drops: held items vão para raidHeldItems, resto vai para raidBag
+  const HELD_ITEM_KEYS = ['focus_band','leftovers','shell_bell','choice_band','lum_berry',
+    'rocky_helmet','life_orb','insect_plate','silk_scarf','white_herb','silver_powder','wise_glasses'];
+
+  const newBag       = Object.assign({}, userData?.raidBag || {});
+  const newHeldItems = Object.assign({}, userData?.raidHeldItems || {});
   Object.entries(drops.itens).forEach(([item, qty]) => {
-    newBag[item] = (newBag[item] || 0) + qty;
+    if (HELD_ITEM_KEYS.includes(item)) {
+      newHeldItems[item] = (newHeldItems[item] || 0) + qty;
+    } else {
+      newBag[item] = (newBag[item] || 0) + qty;
+    }
   });
 
   // Calcular XP novo
@@ -3007,9 +3167,6 @@ async function mostrarDrops(){
     const ppFinal = myBattlePlayer?.ppAtual ?? null;
     // Persistir fainted e status final
     const faintedFinal = (hpAtualFinal !== null && hpAtualFinal <= 0);
-    // Status que persistem entre raids: poison, toxic, burn, paralysis, sleep
-    // Status que NÃO persistem: confusion, stat stages
-    // Pokémon fainted: status removido (fainted já comunica o estado)
     const statusFinalRaw = myBattlePlayer?.status || s.status || null;
     const persistStatus  = ['poison','toxic','burn','paralysis','sleep'];
     const statusFinal    = faintedFinal ? null : (persistStatus.includes(statusFinalRaw) ? statusFinalRaw : null);
@@ -3095,16 +3252,16 @@ async function mostrarDrops(){
   // Gravar no Firestore
   try {
     const fsUpdate = {
-      raidBag:  newBag,
-      raidTeam: JSON.parse(JSON.stringify(novoTeam)),
+      raidBag:        newBag,
+      raidHeldItems:  newHeldItems,
+      raidTeam:       JSON.parse(JSON.stringify(novoTeam)),
       ...(caught ? { pokedex: arrayUnion(_bossNome.toLowerCase()) } : {}),
     };
-    // Se há stand-by, gravar o slot pendente
     if (_bossStandbySlot) {
       fsUpdate.raidStandby = JSON.parse(JSON.stringify(_bossStandbySlot));
     }
     await updateDoc(doc(fsdb,'usuarios',_uid), fsUpdate);
-    if (_userData){ _userData.raidBag = newBag; _userData.raidTeam = novoTeam; }
+    if (_userData){ _userData.raidBag = newBag; _userData.raidHeldItems = newHeldItems; _userData.raidTeam = novoTeam; }
   } catch(e){ console.error('[drops] Firestore error:', e); }
 
   // ── Renderizar popup ──
@@ -3140,12 +3297,16 @@ async function mostrarDrops(){
       <span class="drop-label">${cap(_bossNome)}</span>
     </div>`;
   }
-  // Itens com delay escalonado
+  // Itens com delay escalonado — held items usam /boss/img-held/
   let delay = caught ? 0.15 : 0;
   Object.entries(drops.itens).forEach(([item, qty]) => {
     delay += 0.1;
-    gridHTML += `<div class="drop-item" style="animation-delay:${delay}s">
-      <img src="/boss/img-items/${item}.png" onerror="this.style.opacity='0.3'">
+    const isHeld   = HELD_ITEM_KEYS.includes(item);
+    const imgPath  = isHeld ? `/boss/img-held/${item}.png` : `/boss/img-items/${item}.png`;
+    const badge    = isHeld ? '<span class="drop-held-badge">Held</span>' : '';
+    gridHTML += `<div class="drop-item${isHeld ? ' drop-item-held' : ''}" style="animation-delay:${delay}s">
+      <img src="${imgPath}" onerror="this.style.opacity='0.3'">
+      ${badge}
       <span class="drop-qty">×${qty}</span>
       <span class="drop-label">${item.replace(/_/g,' ')}</span>
     </div>`;
@@ -3209,23 +3370,14 @@ async function mostrarDrops(){
   // deve ser acionada SOMENTE quando o usuário clicar no widget, nunca
   // como side-effect da captura/drops.
   try { localStorage.removeItem('bossraid_pending_mission'); } catch(e) {}
-
-  // ── Gravar resultado da raid para missions.js processar na home ──────────
   try {
     const _totalPlayersRaid = Object.keys(bs?.players || {}).length;
-    const _raidResult = {
-      won:         true,
-      playerCount: _totalPlayersRaid,
-      bossNivel:   _bossData?.nivel || 10,
-      caught:      caught,
-      shiny:       caught && !!bossSlot?.shiny,
-      hasMaxIV:    caught && bossSlot?.ivs
-                   ? Object.values(bossSlot.ivs).some(v => v === 31)
-                   : false,
-    };
-    localStorage.setItem('missions_raid_result', JSON.stringify(_raidResult));
-  } catch(_e) { console.warn('[missions] localStorage raid result:', _e); }
-
+    localStorage.setItem('missions_raid_result', JSON.stringify({
+      won: true, playerCount: _totalPlayersRaid, bossNivel: _bossData?.nivel || 10,
+      caught, shiny: caught && !!bossSlot?.shiny,
+      hasMaxIV: caught && bossSlot?.ivs ? Object.values(bossSlot.ivs).some(v => v === 31) : false,
+    }));
+  } catch(_e) {}
   agendarLimpezaSala();
 }
 
@@ -3312,7 +3464,7 @@ function agendarLimpezaSala(){
 }
 
 
-// ── Salvar HP/fainted após derrota (sem drops) ──────────────
+// ── Salvar HP/fainted/status após derrota (sem drops) ───────
 let _defeatSaved = false;
 async function salvarEstadoDerrota() {
   if (_defeatSaved) return;
@@ -3325,13 +3477,24 @@ async function salvarEstadoDerrota() {
     const bs = _battleSnap;
     const myBattlePlayer = bs?.players?.[_uid];
     const myPokeName = myBattlePlayer?.pokemon || raidTeam[0]?.pokemon;
-    const mySlotIdx  = raidTeam.findIndex(s => s.pokemon === myPokeName);
+
+    // Buscar por slot primeiro (mais preciso que nome)
+    const mySlotNum = myBattlePlayer?.slot ?? null;
+    let mySlotIdx   = mySlotNum !== null
+      ? raidTeam.findIndex(s => s.slot === mySlotNum)
+      : raidTeam.findIndex(s => s.pokemon === myPokeName);
+    if (mySlotIdx < 0 && myPokeName)
+      mySlotIdx = raidTeam.findIndex(s => s.pokemon === myPokeName);
     if (mySlotIdx < 0) return;
 
-    const hpFinal    = myBattlePlayer?.hp ?? null;
-    const fainted    = hpFinal !== null && hpFinal <= 0;
-    // Apenas salvar se de fato sofreu algum dano
+    const hpFinal  = myBattlePlayer?.hp ?? null;
+    const fainted  = hpFinal !== null && hpFinal <= 0;
     if (!fainted && hpFinal === null) return;
+
+    // Status que persistem entre raids
+    const statusRaw     = myBattlePlayer?.status || null;
+    const persistStatus = ['poison','toxic','burn','paralysis','sleep'];
+    const statusFinal   = fainted ? null : (persistStatus.includes(statusRaw) ? statusRaw : null);
 
     const novoTeam = raidTeam.map((s, i) => {
       if (i !== mySlotIdx) return s;
@@ -3340,6 +3503,7 @@ async function salvarEstadoDerrota() {
         ...s,
         hpAtual: fainted ? 0 : hpFinal,
         fainted: fainted ? true : false,
+        status:  statusFinal,
         ppAtual: ppFinal !== null ? ppFinal : (s.ppAtual || {}),
       };
     });
@@ -3370,14 +3534,7 @@ function mostrarResultado(tipo, capturedBy){
   } else if (tipo === 'defeat'){
     icon.textContent='💀'; title.style.color='#ff4444'; title.textContent='Defeated!';
     desc.textContent='Your entire team has fainted. Better luck next time!';
-    try {
-      localStorage.setItem('missions_raid_result', JSON.stringify({
-        won: false,
-        playerCount: Object.keys(_battleSnap?.players || {}).length,
-        bossNivel:   _bossData?.nivel || 10,
-        caught: false, shiny: false, hasMaxIV: false,
-      }));
-    } catch(_e) {}
+    try { localStorage.setItem('missions_raid_result', JSON.stringify({ won:false, playerCount:Object.keys(_battleSnap?.players||{}).length, bossNivel:_bossData?.nivel||10, caught:false, shiny:false, hasMaxIV:false })); } catch(_e) {}
   }
 
   ov.classList.add('show');

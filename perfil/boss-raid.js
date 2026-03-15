@@ -292,8 +292,7 @@ const EVOLUTION_CHAIN = {
   weedle:     { evolvesTo: 'kakuna',     levelReq: 7,  loyaltyReq: 50  },
   kakuna:     { evolvesTo: 'beedrill',   levelReq: 10, loyaltyReq: 50  },
 
-  // ── Linha Spinarak (Bug/Poison) ───────────────────────────
-  // Spinarak → Ariados (L22)
+  // Linha Spinarak
   spinarak:   { evolvesTo: 'ariados',    levelReq: 22, loyaltyReq: 50  },
 };
 
@@ -313,7 +312,6 @@ const EVOLUTION_ABILITIES = {
   // Weedle line
   kakuna:      { normal: ['shed_skin'],           hidden: null, noHidden: true  },  // sem hidden, linhagem continua
   beedrill:    { normal: ['swarm'],               hidden: 'sniper'              },
-  // Spinarak line
   ariados:     { normal: ['swarm','insomnia'],    hidden: 'sniper'              },
   // ── Linha Bulbasaur ───────────────────────────────────────
   ivysaur:     { normal: ['overgrow'],           hidden: 'chlorophyll'   },
@@ -560,7 +558,6 @@ const BASE_STATS_EVO = {
   // Weedle line
   kakuna:      { hp:45,  atk:25,  def:50,  spa:25,  spd:25,  spe:35  },
   beedrill:    { hp:65,  atk:90,  def:40,  spa:45,  spd:80,  spe:75  },
-  // Spinarak line
   ariados:     { hp:70,  atk:90,  def:70,  spa:60,  spd:60,  spe:40  },
 };
 
@@ -1113,11 +1110,10 @@ const ABILITIES_DB = {
   ball_fetch:     { name: 'Ball Fetch',     desc: 'Fetches a Poke Ball if the first throw fails.' },
   cotton_down:    { name: 'Cotton Down',    desc: "Lowers foe's Speed when hit." },
   fluffy:         { name: 'Fluffy',         desc: 'Halves damage from contact moves; doubles from Fire.' },
-  // ── Bug abilities ────────────────────────────────────────
-  shed_skin:      { name: 'Shed Skin',      desc: 'The Pokémon may heal its own status conditions at the end of each turn (30% chance).' },
+  shed_skin:      { name: 'Shed Skin',      desc: 'May heal status conditions at end of each turn (30%).' },
   swarm:          { name: 'Swarm',          desc: 'Powers up Bug-type moves when HP is below 1/3.' },
   insomnia:       { name: 'Insomnia',       desc: 'Prevents the Pokémon from falling asleep.' },
-  compound_eyes:  { name: 'Compound Eyes',  desc: 'Raises the accuracy of moves by 30%.' },
+  compound_eyes:  { name: 'Compound Eyes',  desc: 'Raises accuracy of moves by 30%.' },
   tinted_lens:    { name: 'Tinted Lens',    desc: 'Doubles the power of "not very effective" moves.' },
 };
 
@@ -1197,8 +1193,116 @@ const ITEMS_DB = {
   antidote:      { name:'Antidote',      img:'../boss/img-items/antidote.png',      category:'status', usableIn:'both',   desc:'Cures a Poisoned Pokémon. Can be used on allies in battle.',                    effect:{ type:'antidote' } },
   awakening:     { name:'Awakening',     img:'../boss/img-items/awakening.png',     category:'status', usableIn:'both',   desc:'Wakes up a sleeping Pokémon. Can be used on allies in battle.',                  effect:{ type:'awakening' } },
   leaf_stone:    { name:'Leaf Stone',    img:'../boss/img-items/leaf_stone.png',    category:'evo',    usableIn:'none',   desc:'A peculiar stone that makes certain species of Pokémon evolve. Rare drop from Bulbasaur.' },
+  // ── Held Items — também registrados aqui para drops e exibição na bag ───
+  insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves. Rare drop from Spinarak.' },
+  silk_scarf:    { name:'Silk Scarf',    img:'../boss/img-held/silk_scarf.png',    category:'held',   usableIn:'none',   desc:'A sumptuous scarf that increases the power of Normal-type moves. Rare drop from Wooloo.' },
+  white_herb:    { name:'White Herb',    img:'../boss/img-held/white_herb.png',    category:'held',   usableIn:'none',   desc:'A hold item that restores any lowered stat once in battle. Consumed on use. Rare drop from Caterpie.' },
+  silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves. Rare drop from Weedle.' },
+  wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves. Rare drop from Bulbasaur.' },
 };
 const BAG_ITENS_ORDEM   = ['pokebola','great_ball','ultra_ball','potion','super_potion','hyper_potion','max_potion','revive','max_revive','full_restore','ether','antidote','awakening','leaf_stone'];
+
+// ============================================================
+// HELD ITEMS — itens equipáveis nos pokémons
+// ============================================================
+// Como adicionar um novo held item:
+//   1. Adicione uma entrada em HELD_ITEMS_DB abaixo
+//   2. O efeito passivo é implementado em battle.js
+//   3. O item pode ser dropado via calcularDrops ou dado por missão
+//
+// Estrutura:
+//   key      — chave interna (usada em slot.heldItem e raidHeldItems)
+//   name     — nome exibido
+//   desc     — descrição do efeito passivo
+//   icon     — emoji representativo
+//   img      — caminho para imagem (opcional, fallback ao emoji)
+// ============================================================
+const HELD_ITEMS_DB = {
+  focus_band: {
+    key:  'focus_band',
+    name: 'Focus Band',
+    desc: '12% chance to survive a KO hit with 1 HP.',
+    icon: '🎗️',
+    img:  '/boss/img-held/focus_band.png',
+  },
+  leftovers: {
+    key:  'leftovers',
+    name: 'Leftovers',
+    desc: 'Restores 1/16 max HP at the end of each turn.',
+    icon: '🍖',
+    img:  '/boss/img-held/leftovers.png',
+  },
+  shell_bell: {
+    key:  'shell_bell',
+    name: 'Shell Bell',
+    desc: 'Restores HP equal to 1/8 of damage dealt.',
+    icon: '🐚',
+    img:  '/boss/img-held/shell_bell.png',
+  },
+  choice_band: {
+    key:  'choice_band',
+    name: 'Choice Band',
+    desc: 'Boosts Attack by 50%, but locks into one move.',
+    icon: '💪',
+    img:  '/boss/img-held/choice_band.png',
+  },
+  lum_berry: {
+    key:  'lum_berry',
+    name: 'Lum Berry',
+    desc: 'Cures any status condition once when consumed.',
+    icon: '🫐',
+    img:  '/boss/img-held/lum_berry.png',
+  },
+  rocky_helmet: {
+    key:  'rocky_helmet',
+    name: 'Rocky Helmet',
+    desc: 'Damages the attacker by 1/6 of their max HP on contact.',
+    icon: '⛑️',
+    img:  '/boss/img-held/rocky_helmet.png',
+  },
+  life_orb: {
+    key:  'life_orb',
+    name: 'Life Orb',
+    desc: 'Boosts move power by 30%, costs 1/10 HP per attack.',
+    icon: '🔮',
+    img:  '/boss/img-held/life_orb.png',
+  },
+  insect_plate: {
+    key:  'insect_plate',
+    name: 'Insect Plate',
+    desc: 'Increases the power of Bug-type moves by 20%.',
+    icon: '🪲',
+    img:  '/boss/img-held/insect_plate.png',
+  },
+  silk_scarf: {
+    key:  'silk_scarf',
+    name: 'Silk Scarf',
+    desc: 'Increases the power of Normal-type moves by 20%.',
+    icon: '🧣',
+    img:  '/boss/img-held/silk_scarf.png',
+  },
+  white_herb: {
+    key:  'white_herb',
+    name: 'White Herb',
+    desc: 'Restores any lowered stat in battle once. Consumed on use.',
+    icon: '🌿',
+    img:  '/boss/img-held/white_herb.png',
+  },
+  silver_powder: {
+    key:  'silver_powder',
+    name: 'Silver Powder',
+    desc: 'Increases the power of Bug-type moves by 20%.',
+    icon: '✨',
+    img:  '/boss/img-held/silver_powder.png',
+  },
+  wise_glasses: {
+    key:  'wise_glasses',
+    name: 'Wise Glasses',
+    desc: 'Increases the power of Special-category moves by 10%.',
+    icon: '🔬',
+    img:  '/boss/img-held/wise_glasses.png',
+  },
+};
 // ──────────────────────────────────────────────────────────────
 // BAG INICIAL — itens que todo novo jogador recebe ao começar
 // Para editar: altere as quantidades abaixo ou adicione novas chaves.
@@ -1767,7 +1871,6 @@ function inicializarQuestWidget() {
 window.missaoDiariaCompleta = completarMissaoDiaria;
 window.iniciarQuestRaid     = iniciarQuest;
 
-// Expor processarPlayerLevelUp para missions.js usar no claim
 window.processarPlayerLevelUpGlobal = function(xpGanho) {
   if (!_userData || !xpGanho) return;
   const result = processarPlayerLevelUp(_userData, xpGanho);
@@ -1846,27 +1949,18 @@ export async function initBossRaid(userId, db, userData) {
   _userId   = userId;
   _userData = userData;
   console.log('[BossRaid] Inicializando:', userId);
-
-  // Normalizar playerXP/Level ao iniciar — corrige dados com XP acima do threshold
   {
-    let nivel   = _userData.playerLevel || 1;
-    let xp      = _userData.playerXP    || 0;
+    let nivel = _userData.playerLevel || 1;
+    let xp    = _userData.playerXP    || 0;
     let changed = false;
-    while (xp >= xpParaProximoNivelPlayer(nivel)) {
-      xp    -= xpParaProximoNivelPlayer(nivel);
-      nivel += 1;
-      changed = true;
-    }
+    while (xp >= xpParaProximoNivelPlayer(nivel)) { xp -= xpParaProximoNivelPlayer(nivel); nivel++; changed = true; }
     if (changed) {
-      _userData.playerLevel = nivel;
-      _userData.playerXP    = xp;
+      _userData.playerLevel = nivel; _userData.playerXP = xp;
       import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js')
-        .then(({ doc, updateDoc }) =>
-          updateDoc(doc(db, 'usuarios', userId), { playerLevel: nivel, playerXP: xp })
-        ).catch(e => console.warn('[BossRaid] fix playerXP:', e));
+        .then(({ doc, updateDoc }) => updateDoc(doc(db,'usuarios',userId),{playerLevel:nivel,playerXP:xp}))
+        .catch(e => console.warn('[BossRaid] fix playerXP:', e));
     }
   }
-
   renderizarBossRaid();
   // Iniciar poison tick (1 HP/min para pokemons envenenados fora de batalha)
   iniciarPoisonTick();
@@ -2186,7 +2280,6 @@ function xpPlayerPorBoss(bossNivel) {
 
 // Renderiza a barra de XP/Level do player — inserida entre My Team e Pokédex
 function renderPlayerLevelWidget(userData) {
-  // Normalizar XP acumulado — processa level-ups pendentes para exibir corretamente
   let nivel   = userData?.playerLevel || 1;
   let xpAtual = userData?.playerXP    || 0;
   while (xpAtual >= xpParaProximoNivelPlayer(nivel)) {
@@ -2194,7 +2287,7 @@ function renderPlayerLevelWidget(userData) {
     nivel   += 1;
   }
   const xpProx = xpParaProximoNivelPlayer(nivel);
-  const pct    = Math.min(100, Math.floor((xpAtual / xpProx) * 100));
+  const pct      = Math.min(100, Math.floor((xpAtual / xpProx) * 100));
 
   return `
     <div class="player-level-widget">
@@ -2358,6 +2451,7 @@ const BOSS_EVENT_INFO = {
         { item: 'Ether',      chance: '50%'  },
         { item: 'Antidote',   chance: '50%'  },
         { item: 'Awakening',  chance: '40%'  },
+        { item: 'White Herb',  chance: '8%'   },
       ],
     },
     {
@@ -2373,6 +2467,7 @@ const BOSS_EVENT_INFO = {
         { item: 'Antidote',   chance: '50%'  },
         { item: 'Awakening',  chance: '40%'  },
         { item: 'Ether',      chance: '25%'  },
+        { item: 'Silver Powder', chance: '8%' },
       ],
     },
     {
@@ -2388,6 +2483,7 @@ const BOSS_EVENT_INFO = {
         { item: 'Antidote',   chance: '50%'  },
         { item: 'Awakening',  chance: '40%'  },
         { item: 'Potion ×2',  chance: '25%'  },
+        { item: 'Silk Scarf',  chance: '8%'   },
       ],
     },
     {
@@ -2403,6 +2499,7 @@ const BOSS_EVENT_INFO = {
         { item: 'Antidote',     chance: '70%'  },
         { item: 'Awakening',    chance: '50%'  },
         { item: 'Ether',        chance: '35%'  },
+        { item: 'Insect Plate', chance: '8%'   },
       ],
     },
     {
@@ -2419,6 +2516,7 @@ const BOSS_EVENT_INFO = {
         { item: 'Awakening',    chance: '50%'  },
         { item: 'Ether',        chance: '35%'  },
         { item: 'Leaf Stone',   chance: '8%'   },
+        { item: 'Wise Glasses', chance: '8%'   },
       ],
     },
   ],
@@ -2444,6 +2542,12 @@ const INFO_ITEM_IMG_MAP = {
   'Antidote':     'antidote',
   'Awakening':    'awakening',
   'Leaf Stone':   'leaf_stone',
+  // Held items — exibição no info modal
+  'Insect Plate': 'insect_plate',
+  'Silk Scarf':   'silk_scarf',
+  'White Herb':   'white_herb',
+  'Silver Powder':'silver_powder',
+  'Wise Glasses': 'wise_glasses',
 };
 function getInfoItemImg(nome) {
   // Remove quantidade do nome (ex: "Potion ×2" -> "Potion")
@@ -3640,6 +3744,80 @@ function abrirUsarItem(key) {
 // ============================================================
 // MODAL DE STATUS — layout 3 colunas
 // ============================================================
+// ============================================================
+// HELD ITEM MODAL — selecionar item para equipar no pokémon
+// ============================================================
+function abrirHeldItemModal(slot) {
+  document.getElementById('heldItemModal')?.remove();
+
+  // Buscar held items disponíveis do usuário
+  const heldBag = _userData?.raidHeldItems || {};
+  const available = Object.entries(HELD_ITEMS_DB).filter(([key]) => (heldBag[key] || 0) > 0);
+
+  const itemsHTML = available.length
+    ? available.map(([key, item]) => {
+        const qty     = heldBag[key] || 0;
+        const equipado = slot.heldItem === key;
+        return `<div class="held-modal-item ${equipado ? 'held-equipado' : ''}" data-key="${key}">
+          <div class="held-modal-icon">${item.icon}</div>
+          <div class="held-modal-info">
+            <span class="held-modal-name">${item.name} ${equipado ? '(Equipped)' : `×${qty}`}</span>
+            <span class="held-modal-desc">${item.desc}</span>
+          </div>
+          ${!equipado ? `<button class="held-modal-equip-btn" data-key="${key}">Equip</button>` : ''}
+        </div>`;
+      }).join('')
+    : '<div class="held-modal-empty">No held items available.<br><span style="font-size:0.7rem;color:#666">Items can be obtained from missions and raids.</span></div>';
+
+  const modal = document.createElement('div');
+  modal.id        = 'heldItemModal';
+  modal.className = 'held-modal-overlay';
+  modal.innerHTML = `
+    <div class="held-modal-box">
+      <div class="held-modal-header">
+        <span>🎒 Held Items</span>
+        <button class="held-modal-close" id="heldModalClose">✕</button>
+      </div>
+      <div class="held-modal-list">${itemsHTML}</div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('show'), 20);
+
+  modal.querySelector('#heldModalClose').addEventListener('click', () => {
+    modal.classList.remove('show');
+    setTimeout(() => modal.remove(), 250);
+  });
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.classList.remove('show'); setTimeout(() => modal.remove(), 250); } });
+
+  modal.querySelectorAll('.held-modal-equip-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const itemKey = btn.dataset.key;
+      btn.disabled = true; btn.textContent = '...';
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+        const novoTeam = (_userData.raidTeam || []).map(s =>
+          s.slot === slot.slot ? { ...s, heldItem: itemKey } : s
+        );
+        await updateDoc(doc(_db, 'usuarios', _userId), { raidTeam: JSON.parse(JSON.stringify(novoTeam)) });
+        _userData.raidTeam = novoTeam;
+        slot.heldItem = itemKey;
+        modal.classList.remove('show');
+        setTimeout(() => modal.remove(), 250);
+        const itemName = HELD_ITEMS_DB[itemKey]?.name || itemKey;
+        mostrarToastSimples(`✅ ${capitalizar(slot.pokemon)} equipped ${itemName}!`, 'ok');
+        // Re-abrir modal de status com o item atualizado
+        document.getElementById('raidModalStatus')?.classList.remove('show');
+        abrirModalStatus(novoTeam.find(s => s.slot === slot.slot) || slot);
+      } catch(e) {
+        console.error('[heldItem] equip:', e);
+        mostrarToastSimples('❌ Error equipping item.', 'erro');
+        btn.disabled = false; btn.textContent = 'Equip';
+      }
+    });
+  });
+}
+
 function abrirModalStatus(slot) {
   // ── Dados base ──────────────────────────────────────────────
   const ivs = (slot.ivs && typeof slot.ivs === 'object') ? {
@@ -3898,6 +4076,21 @@ function abrirModalStatus(slot) {
     + '<span class="ev-rodape-val" id="evPontosDisplay">' + evPointsSalvos + '</span>'
     + '' /* btnConfirmarEV aparece dinamicamente só após distribuir pontos */
     + '</div>'
+    // ── Held Item ─────────────────────────────────────────────
+    + (() => {
+        const hi     = slot.heldItem ? HELD_ITEMS_DB[slot.heldItem] : null;
+        const hiName = hi ? hi.name : 'No item equipped';
+        const hiIcon = hi ? hi.icon : '➕';
+        const hiDesc = hi ? hi.desc : 'Click to equip a held item.';
+        return '<div class="held-item-slot" id="heldItemSlot">'
+          + '<div class="held-item-icon">' + hiIcon + '</div>'
+          + '<div class="held-item-info">'
+          + '<span class="held-item-name">' + hiName + '</span>'
+          + '<span class="held-item-desc">' + hiDesc + '</span>'
+          + '</div>'
+          + (hi ? '<button class="held-item-remove" id="btnRemoveHeld">✕</button>' : '')
+          + '</div>';
+      })()
     // Linha evolutiva abaixo dos EV Points, col-2
     + renderLinhaEvolutiva(slot.pokemon)
     + (() => {
@@ -3935,10 +4128,8 @@ function abrirModalStatus(slot) {
 
   document.getElementById('raidModalStatus').classList.add('show');
 
-  // Aplicar borda cosmetica equipada (missions.js)
   if (typeof window.aplicarBordaEquipada === 'function') window.aplicarBordaEquipada();
 
-  // Setas de navegação — standby slots não têm .slot, pular
   const _isStandbyNav = slot.expiraEm !== undefined && slot.slot === undefined;
   const teamNav    = _userData?.raidTeam || [];
   const idxAtual   = _isStandbyNav ? -1 : teamNav.findIndex(s => s.slot === slot.slot);
@@ -4013,10 +4204,37 @@ function abrirModalStatus(slot) {
   // Listeners dos botoes Start de missao
   document.querySelectorAll('.missao-start-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const key    = btn.dataset.missao;
-      const slotN  = parseInt(btn.dataset.slot) || 1;
+      const key   = btn.dataset.missao;
+      const slotN = Math.max(1, parseInt(btn.dataset.slot, 10) || 1);
       iniciarQuest(key, slotN);
     });
+  });
+
+  // ── Held Item: abrir modal ao clicar no slot ───────────────
+  document.getElementById('heldItemSlot')?.addEventListener('click', (e) => {
+    if (e.target.id === 'btnRemoveHeld') return; // tratado abaixo
+    abrirHeldItemModal(slot);
+  });
+  // Remover held item
+  document.getElementById('btnRemoveHeld')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const btn = document.getElementById('btnRemoveHeld');
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    try {
+      const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+      const novoTeam = (_userData.raidTeam || []).map(s =>
+        s.slot === slot.slot ? { ...s, heldItem: null } : s
+      );
+      await updateDoc(doc(_db, 'usuarios', _userId), { raidTeam: JSON.parse(JSON.stringify(novoTeam)) });
+      _userData.raidTeam = novoTeam;
+      slot.heldItem = null;
+      mostrarToastSimples('✅ Item unequipped!', 'ok');
+      document.getElementById('raidModalStatus')?.classList.remove('show');
+      abrirModalStatus(novoTeam.find(s => s.slot === slot.slot) || slot);
+    } catch(e) {
+      console.error('[heldItem] remove:', e);
+      mostrarToastSimples('❌ Error removing item.', 'erro');
+    }
   });
 
   function atualizarEVUI() {

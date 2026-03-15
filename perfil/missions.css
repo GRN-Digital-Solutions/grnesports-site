@@ -132,7 +132,14 @@
   overflow-y: auto;
   flex: 1;
   padding: 16px 20px;
+  /* Scrollbar estilizada — igual ao padrão do sistema */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,117,0,0.35) transparent;
 }
+.mss-content::-webkit-scrollbar        { width: 5px; }
+.mss-content::-webkit-scrollbar-track  { background: transparent; }
+.mss-content::-webkit-scrollbar-thumb  { background: rgba(255,117,0,0.35); border-radius: 99px; }
+.mss-content::-webkit-scrollbar-thumb:hover { background: rgba(255,117,0,0.6); }
 .mss-panel-hidden {
   display: none !important;
 }
@@ -279,12 +286,54 @@
 }
 
 .mss-tier-reward {
-  font-size: 0.68rem;
-  color: #e0b845;
-  margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
 }
 .mss-tier-done .mss-tier-reward {
-  color: #666;
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+
+/* Chip individual de reward */
+.mss-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  padding: 3px 7px 3px 4px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #e0b845;
+  white-space: nowrap;
+}
+.mss-reward-chip.mss-reward-xp {
+  background: rgba(255,215,0,0.10);
+  border-color: rgba(255,215,0,0.25);
+  color: #ffe066;
+}
+.mss-reward-chip.mss-reward-cosmetic {
+  background: rgba(155,89,182,0.12);
+  border-color: rgba(155,89,182,0.30);
+  color: #d7a2f5;
+}
+.mss-reward-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+.mss-reward-qty {
+  color: #ffad00;
+  font-weight: 900;
+}
+.mss-reward-name {
+  color: #ccc;
+  font-weight: 600;
 }
 
 /* ════════════════════════════════════════════════════════════

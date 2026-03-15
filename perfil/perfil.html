@@ -292,64 +292,6 @@
         </div>
       </section>
 
-      <!-- Ãrea para Battle Ribbons List -->
-      <section class="perfil-section">
-        <h2>Battle Ribbons List</h2>
-        
-        <div class="perfil-content">
-          <!-- Gold Ribbon -->
-          <div class="ribbon-tier">
-            <div class="ribbon-icon-container">
-              <img src="../estatisticas-shad/images/icons/dourado.png" alt="Gold Ribbon" class="ribbon-icon">
-            </div>
-            <div class="ribbon-pokemon-list" id="goldRibbonList" data-tier="gold">
-              <button class="btn-add-pokemon" data-tier="gold">+</button>
-            </div>
-          </div>
-
-          <!-- Blue Ribbon -->
-          <div class="ribbon-tier">
-            <div class="ribbon-icon-container">
-              <img src="../estatisticas-shad/images/icons/azul.png" alt="Blue Ribbon" class="ribbon-icon">
-            </div>
-            <div class="ribbon-pokemon-list" id="blueRibbonList" data-tier="blue">
-              <button class="btn-add-pokemon" data-tier="blue">+</button>
-            </div>
-          </div>
-
-          <!-- Green Ribbon -->
-          <div class="ribbon-tier">
-            <div class="ribbon-icon-container">
-              <img src="../estatisticas-shad/images/icons/verde.png" alt="Green Ribbon" class="ribbon-icon">
-            </div>
-            <div class="ribbon-pokemon-list" id="greenRibbonList" data-tier="green">
-              <button class="btn-add-pokemon" data-tier="green">+</button>
-            </div>
-          </div>
-
-          <!-- Botões de Ação -->
-          <div class="ribbon-actions">
-            <button class="btn-ribbon-action btn-save-ribbons" id="btnSaveRibbons">
-              💾 Save List
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Modal de Seleção de Pokémon para Ribbons -->
-  <div class="modal-overlay" id="modalRibbonPokemon">
-    <div class="modal-content modal-ribbon-content">
-      <div class="modal-header">
-        <h3>Select Pokémon</h3>
-        <button class="modal-close" id="btnCloseRibbonModal">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="ribbon-pokemon-grid" id="ribbonPokemonGrid">
-          <!-- Pokémons serão carregados aqui -->
-        </div>
-      </div>
-    </div>
-  </div>
   </main>
 
   <!-- Modal de Seleção de Avatar -->
@@ -399,7 +341,6 @@
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
   // Importar funções do perfil.js
-  import { initRibbons } from './perfil.js';
   import { initBossRaid } from './boss-raid.js';
   import { initMissions } from './missions.js';
   
@@ -1725,11 +1666,6 @@ async function updateUI(user) {
     carregarImagensSprites().then(lista => {
       pokemonList = lista;
       console.log(`${pokemonList.length} avatares carregados`);
-      
-      // Inicializar sistema de ribbons após carregar pokémons
-      if (user && pokemonList.length > 0) {
-        initRibbons(user.uid, pokemonList, db);
-      }
     });
   });
 </script>

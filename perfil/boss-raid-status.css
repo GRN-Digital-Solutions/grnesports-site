@@ -84,6 +84,11 @@
   border-right: 1px solid rgba(255, 117, 0, 0.2);
 }
 
+/* Coluna de moves — sem scroll forçado, conteúdo flui naturalmente */
+.raid-col-moves {
+  /* overflow-y removido — a coluna não precisa de scroll próprio */
+}
+
 /* ── COLUNA 1 — HEADER POKÉMON ───────────────────────────── */
 .raid-status-header {
   display: flex;
@@ -310,7 +315,18 @@
 }
 
 /* ── COLUNA 3 — GOLPES ───────────────────────────────────── */
-.raid-golpes-grid { display: flex; flex-direction: column; gap: 8px; }
+.raid-golpes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Scrollbar para quando há muitos golpes */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,117,0,0.35) transparent;
+}
+.raid-golpes-grid::-webkit-scrollbar        { width: 5px; }
+.raid-golpes-grid::-webkit-scrollbar-track  { background: transparent; }
+.raid-golpes-grid::-webkit-scrollbar-thumb  { background: rgba(255,117,0,0.35); border-radius: 99px; }
+.raid-golpes-grid::-webkit-scrollbar-thumb:hover { background: rgba(255,117,0,0.6); }
 .raid-golpe-slot {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px; padding: 9px 12px;
@@ -434,32 +450,13 @@
 }
 .raid-myteam-titulo { color: #ffad00; font-size: 1rem; font-weight: 700; margin: 0; }
 .raid-myteam-desc   { color: #666; font-size: 0.72rem; margin: 0 0 12px; }
-
-/* Wrapper que agrupa os 3 botões do lado direito */
-.raid-topbar-btns {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .raid-pokedex-btn {
   background: rgba(255,117,0,0.12); border: 1px solid rgba(255,117,0,0.35);
   color: #ffad00; border-radius: 8px; padding: 5px 12px;
   font-size: 0.74rem; cursor: pointer; font-weight: 600;
   transition: background 0.2s;
-  white-space: nowrap;
 }
 .raid-pokedex-btn:hover { background: rgba(255,117,0,0.25); }
-
-/* Missions: mesma base, apenas cor roxa diferente */
-.raid-pokedex-btn.raid-pokedex-btn-missions {
-  background: rgba(155,89,182,0.15);
-  border-color: rgba(155,89,182,0.45);
-  color: #d7a2f5;
-}
-.raid-pokedex-btn.raid-pokedex-btn-missions:hover {
-  background: rgba(155,89,182,0.28);
-}
 
 .raid-slots-grid {
   display: grid;
@@ -827,6 +824,117 @@
 .ev-confirmar-btn:hover {
   background: rgba(126,200,227,0.28);
   border-color: rgba(126,200,227,0.7);
+}
+
+/* ── HELD ITEM SLOT (no modal de stats, abaixo dos EV Points) ── */
+.held-item-slot {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; padding: 8px 10px;
+  background: rgba(255,180,0,0.06);
+  border: 1px solid rgba(255,180,0,0.20);
+  border-radius: 8px; cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  position: relative;
+}
+.held-item-slot:hover {
+  background: rgba(255,180,0,0.12);
+  border-color: rgba(255,180,0,0.45);
+}
+.held-item-icon {
+  font-size: 1.4rem; flex-shrink: 0; width: 28px; text-align: center;
+}
+.held-item-info {
+  display: flex; flex-direction: column; flex: 1; min-width: 0;
+}
+.held-item-name {
+  font-size: 0.72rem; font-weight: 700; color: #ffcc66;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.held-item-desc {
+  font-size: 0.60rem; color: #888; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.held-item-remove {
+  background: rgba(255,80,80,0.12);
+  border: 1px solid rgba(255,80,80,0.30);
+  color: #ff6b6b; border-radius: 50%;
+  width: 20px; height: 20px;
+  font-size: 0.65rem; font-weight: 700;
+  cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.held-item-remove:hover { background: rgba(255,80,80,0.30); }
+
+/* ── HELD ITEM MODAL (overlay de seleção) ────────────────── */
+.held-modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.held-modal-overlay.show { opacity: 1; pointer-events: all; }
+.held-modal-box {
+  background: rgba(14,14,18,0.98);
+  border: 1px solid rgba(255,180,0,0.30);
+  border-radius: 14px; width: 90vw; max-width: 420px;
+  max-height: 80vh; display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  transform: translateY(16px);
+  transition: transform 0.22s ease;
+}
+.held-modal-overlay.show .held-modal-box { transform: translateY(0); }
+.held-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-size: 0.85rem; font-weight: 700; color: #ffcc66;
+}
+.held-modal-close {
+  background: none; border: none; color: #666;
+  font-size: 1rem; cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; transition: color 0.15s;
+}
+.held-modal-close:hover { color: #fff; }
+.held-modal-list {
+  overflow-y: auto; flex: 1; padding: 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,180,0,0.3) transparent;
+}
+.held-modal-list::-webkit-scrollbar { width: 4px; }
+.held-modal-list::-webkit-scrollbar-thumb { background: rgba(255,180,0,0.3); border-radius: 99px; }
+.held-modal-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.15s;
+}
+.held-modal-item:hover { background: rgba(255,180,0,0.07); }
+.held-modal-item.held-equipado {
+  border-color: rgba(255,180,0,0.35);
+  background: rgba(255,180,0,0.08);
+}
+.held-modal-icon { font-size: 1.3rem; width: 28px; text-align: center; flex-shrink: 0; }
+.held-modal-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.held-modal-name { font-size: 0.72rem; font-weight: 700; color: #eee; }
+.held-modal-desc { font-size: 0.60rem; color: #888; margin-top: 2px; }
+.held-modal-equip-btn {
+  background: rgba(255,180,0,0.15);
+  border: 1px solid rgba(255,180,0,0.40);
+  color: #ffcc66; border-radius: 6px;
+  padding: 4px 12px; font-size: 0.66rem; font-weight: 700;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.held-modal-equip-btn:hover { background: rgba(255,180,0,0.30); }
+.held-modal-equip-btn:disabled { opacity: 0.5; cursor: default; }
+.held-modal-empty {
+  text-align: center; padding: 24px 16px;
+  font-size: 0.75rem; color: #555;
 }
 
 /* Highlight linha na tabela ao ter EVs */
