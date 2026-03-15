@@ -24,10 +24,12 @@ export const COSMETICS = {
     id:       'default',
     label:    'Default',
     desc:     'Standard orange border.',
-    cssClass: '',             // sem classe extra — usa o estilo padrão
+    cssClass: '',
     preview:  '🟧',
     rarity:   'common',
+    free:     true,   // gratuito para todos
   },
+
 
   // ── Uncommon ──────────────────────────────────────────────
   border_silver: {

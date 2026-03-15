@@ -539,21 +539,6 @@ body {
 }
 .drop-item.caught-pokemon .drop-qty { color:#ffad00; }
 
-/* Held item drop — destaque dourado */
-.drop-item.drop-item-held {
-  border-color: rgba(255,210,0,0.5);
-  background: rgba(255,210,0,0.07);
-  position: relative;
-}
-.drop-held-badge {
-  position: absolute; top: 4px; right: 4px;
-  background: rgba(255,180,0,0.25);
-  border: 1px solid rgba(255,180,0,0.5);
-  color: #ffcc44; font-size: 0.48rem; font-weight: 800;
-  padding: 1px 4px; border-radius: 4px;
-  text-transform: uppercase; letter-spacing: 0.5px;
-}
-
 .drops-xp-bar-wrap { margin:0 0 18px; }
 .drops-xp-label {
   display:flex; justify-content:space-between;
@@ -869,9 +854,8 @@ body {
 .player-row::before {
   content: '';
   position: absolute;
-  top: 6px; bottom: 0px;    /* desce até o fim do sprite */
-  /* left mais próximo do pokemon — menos espaço vazio à esquerda */
-  left:  -148px;          /* cobre o sprite (128px) com margem mínima */
+  top: 6px; bottom: 0px;
+  left:  -148px;          /* cobre apenas o sprite (128px) com margem mínima */
   right: -100vw;
   background: rgba(255,255,255,0.13);
   border-left: 4px solid rgba(40,220,100,0.0);
@@ -914,3 +898,221 @@ body {
 .player-poke-img { position: relative; z-index: 1; }
 .player-info      { position: relative; z-index: 1; }
 
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE — layout vertical otimizado para telas pequenas
+   Redesenhado para < 640px: arena dividida em 3 zonas:
+   [topo: boss] [meio: players] [baixo: HUD]
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* ── Arena: flex column, sem posicionamento absoluto ── */
+  #arena {
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Zona do boss: ocupa ~38% da tela ── */
+  .boss-side {
+    position: relative;
+    left: auto; top: auto;
+    transform: none;
+    width: 100%;
+    height: 38vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 6px;
+    gap: 4px;
+  }
+
+  .boss-sprite {
+    width: clamp(90px, 22vw, 130px);
+  }
+
+  .boss-hp-bar-wrap {
+    width: 80vw;
+    max-width: 320px;
+  }
+
+  /* ── Zona dos players: ocupa ~22% da tela ── */
+  .players-side {
+    position: relative;
+    right: auto; top: auto;
+    transform: none;
+    width: 100%;
+    height: 22vh;
+    display: flex;
+    flex-direction: row;          /* jogadores lado a lado no mobile */
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* Player row: compacto no mobile */
+  .player-row {
+    min-width: unset;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transform: none !important; /* remove escada effect */
+  }
+
+  .player-poke-img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .player-info {
+    text-align: center;
+  }
+
+  .player-nick {
+    font-size: 0.55rem;
+  }
+
+  .player-poke-name {
+    font-size: 0.6rem;
+  }
+
+  .player-hp-bar-wrap {
+    width: 70px;
+    margin-top: 2px;
+  }
+
+  .player-hp-label {
+    font-size: 0.5rem;
+  }
+
+  /* Linha da faixa verde: desativar no mobile (causa confusão) */
+  .player-row::before { display: none; }
+
+  /* ── HUD inferior: ocupa ~40vh ── */
+  #actionHUD {
+    position: relative;
+    bottom: auto; left: auto; right: auto;
+    height: 40vh;
+    min-height: unset;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Log + botões em coluna */
+  #msgBox {
+    flex: 0 0 auto;
+    min-width: unset;
+    max-height: 60px;
+    padding: 6px 12px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    overflow: hidden;
+  }
+
+  /* Painel de botões em linha horizontal */
+  #btnPanel {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .bt-btn {
+    flex: 1;
+    padding: 10px 6px;
+    font-size: 0.72rem;
+    border-radius: 8px;
+    letter-spacing: 0.3px;
+  }
+
+  /* Sub-painel (golpes/bag): ocupa o resto */
+  #subPanel {
+    flex: 1;
+    min-width: unset;
+    max-width: 100%;
+    max-height: unset;
+    padding: 8px 10px;
+    border-left: none;
+    overflow-y: auto;
+  }
+
+  /* Grid de golpes: 2 colunas em mobile */
+  .move-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+
+  .move-card {
+    min-height: 42px;
+    padding: 5px 7px;
+    font-size: 0.7rem;
+  }
+
+  /* Sub-buttons (bag items) */
+  .sub-btn {
+    padding: 8px 10px;
+    font-size: 0.72rem;
+  }
+
+  /* Banner de turno */
+  #turnBanner {
+    top: 6px;
+    font-size: 0.68rem;
+    padding: 4px 14px;
+  }
+
+  #turnTimer {
+    top: 6px;
+    right: 10px;
+    font-size: 0.68rem;
+    padding: 3px 9px;
+  }
+
+  /* Drops overlay no mobile */
+  #dropsOverlay {
+    padding: 16px 12px;
+  }
+
+  #dropsGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .drop-item img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .drop-item .drop-label {
+    font-size: 0.5rem;
+  }
+
+  /* Move swap dialog */
+  .mswap-overlay {
+    padding: 12px;
+  }
+
+  .mswap-box {
+    max-width: 100%;
+    padding: 14px 12px;
+  }
+}
+
+/* ── Telas muito pequenas (iPhone SE, etc.) ── */
+@media (max-width: 380px) {
+  .boss-sprite { width: 80px; }
+  .player-poke-img { width: 46px; height: 46px; }
+  .bt-btn { font-size: 0.65rem; padding: 8px 4px; }
+  #msgBox { max-height: 50px; font-size: 0.65rem; }
+}

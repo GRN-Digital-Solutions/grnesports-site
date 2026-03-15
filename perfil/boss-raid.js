@@ -1192,6 +1192,7 @@ const ITEMS_DB = {
   ether:         { name:'Ether',         img:'../boss/img-items/ether.png',         category:'pp',     usableIn:'both',   desc:'Restores 20 PP of a chosen move. Select a Pokemon, then choose the move.',  effect:{ type:'restorepp', value:20 } },
   antidote:      { name:'Antidote',      img:'../boss/img-items/antidote.png',      category:'status', usableIn:'both',   desc:'Cures a Poisoned Pokémon. Can be used on allies in battle.',                    effect:{ type:'antidote' } },
   awakening:     { name:'Awakening',     img:'../boss/img-items/awakening.png',     category:'status', usableIn:'both',   desc:'Wakes up a sleeping Pokémon. Can be used on allies in battle.',                  effect:{ type:'awakening' } },
+  burn_heal:     { name:'Burn Heal',     img:'../boss/img-items/burn_heal.png',     category:'status', usableIn:'both',   desc:'Heals a Burned Pokémon. Can be used on allies in battle.',                      effect:{ type:'burn_heal' } },
   leaf_stone:    { name:'Leaf Stone',    img:'../boss/img-items/leaf_stone.png',    category:'evo',    usableIn:'none',   desc:'A peculiar stone that makes certain species of Pokémon evolve. Rare drop from Bulbasaur.' },
   // ── Held Items — também registrados aqui para drops e exibição na bag ───
   insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves. Rare drop from Spinarak.' },
@@ -1200,7 +1201,7 @@ const ITEMS_DB = {
   silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves. Rare drop from Weedle.' },
   wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves. Rare drop from Bulbasaur.' },
 };
-const BAG_ITENS_ORDEM   = ['pokebola','great_ball','ultra_ball','potion','super_potion','hyper_potion','max_potion','revive','max_revive','full_restore','ether','antidote','awakening','leaf_stone'];
+const BAG_ITENS_ORDEM   = ['pokebola','great_ball','ultra_ball','potion','super_potion','hyper_potion','max_potion','revive','max_revive','full_restore','ether','antidote','awakening','burn_heal','leaf_stone'];
 
 // ============================================================
 // HELD ITEMS — itens equipáveis nos pokémons
@@ -1870,6 +1871,7 @@ function inicializarQuestWidget() {
 // Expor globalmente para outros modulos (perfil-view, build-rating, etc.)
 window.missaoDiariaCompleta = completarMissaoDiaria;
 window.iniciarQuestRaid     = iniciarQuest;
+
 
 window.processarPlayerLevelUpGlobal = function(xpGanho) {
   if (!_userData || !xpGanho) return;
@@ -2556,6 +2558,82 @@ function getInfoItemImg(nome) {
   return key ? `/boss/img-items/${key}.png` : null;
 }
 
+// ============================================================
+// DIARY — histórico das últimas 5 raids
+// ============================================================
+function abrirDiary() {
+  document.getElementById('diaryModal')?.remove();
+
+  const diary  = _userData?.raidDiary || [];
+  const HELD_KEYS = Object.keys(HELD_ITEMS_DB);
+
+  const cardsHTML = diary.length === 0
+    ? '<div class="diary-empty">No raids recorded yet.<br><span style="font-size:0.7rem;color:#555">Complete a raid to see your history here.</span></div>'
+    : diary.map((entry, idx) => {
+        const date = new Date(entry.ts);
+        const dateStr = date.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+          + ' ' + date.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+
+        const dropsHTML = (entry.drops || []).map(d => {
+          const isHeld  = HELD_KEYS.includes(d.item);
+          const imgPath = isHeld ? `/boss/img-held/${d.item}.png` : `/boss/img-items/${d.item}.png`;
+          const dbEntry = ITEMS_DB[d.item] || HELD_ITEMS_DB[d.item];
+          const label   = dbEntry?.name || d.item.replace(/_/g,' ');
+          return `<div class="diary-drop-chip ${isHeld ? 'diary-drop-held' : ''}">
+            <img src="${imgPath}" class="diary-drop-img" onerror="this.style.opacity='0.3'">
+            <span class="diary-drop-label">${label}</span>
+            <span class="diary-drop-qty">×${d.qty}</span>
+            ${isHeld ? '<span class="diary-held-tag">HELD</span>' : ''}
+          </div>`;
+        }).join('');
+
+        const caughtBadge = entry.caught
+          ? `<span class="diary-caught-badge">${entry.shiny ? '✨ Shiny Caught!' : '✅ Caught!'}</span>`
+          : '<span class="diary-fled-badge">❌ Not caught</span>';
+
+        const bossSprite = `/boss/img-bosses/${entry.boss}.png`;
+        return `<div class="diary-card" style="animation-delay:${idx * 0.06}s">
+          <div class="diary-card-header">
+            <img src="${bossSprite}" class="diary-boss-img" onerror="this.src='/boss/img-pokeicon/${entry.boss}.png'">
+            <div class="diary-card-title">
+              <span class="diary-boss-name">${capitalizar(entry.boss)}</span>
+              <span class="diary-boss-lv">Lv. ${entry.nivel}</span>
+            </div>
+            ${caughtBadge}
+            <span class="diary-date">${dateStr}</span>
+          </div>
+          <div class="diary-rewards">
+            ${dropsHTML}
+            <div class="diary-drop-chip diary-drop-xp">⭐ +${entry.xp} XP</div>
+            <div class="diary-drop-chip diary-drop-leal">💖 +${entry.lealdade} Loyalty</div>
+          </div>
+        </div>`;
+      }).join('');
+
+  const modal = document.createElement('div');
+  modal.id        = 'diaryModal';
+  modal.className = 'info-modal-overlay';   // reusar overlay do info modal
+  modal.innerHTML = `
+    <div class="info-modal-box diary-modal-box">
+      <div class="info-modal-header">
+        <span class="info-modal-title">📓 Raid Diary</span>
+        <button class="info-modal-close" id="diaryClose">✕</button>
+      </div>
+      <div class="diary-modal-body">${cardsHTML}</div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('show'), 20);
+
+  modal.querySelector('#diaryClose').addEventListener('click', () => {
+    modal.classList.remove('show');
+    setTimeout(() => modal.remove(), 250);
+  });
+  modal.addEventListener('click', e => {
+    if (e.target === modal) { modal.classList.remove('show'); setTimeout(() => modal.remove(), 250); }
+  });
+}
+
 function abrirModalInfo() {
   const info = BOSS_EVENT_INFO;
 
@@ -2640,6 +2718,7 @@ function renderMyTeam(container, raidTeam) {
           <button class="raid-pokedex-btn" id="btnAbrirInfo">ℹ️ Info</button>
           <button class="raid-pokedex-btn" id="btnAbrirPokedex">📖 Pokédex</button>
           <button class="raid-pokedex-btn raid-pokedex-btn-missions" id="btnAbrirMissions">🏆 Missions</button>
+          <button class="raid-pokedex-btn raid-pokedex-btn-diary" id="btnAbrirDiary">📓 Diary</button>
         </div>
       </div>
       ${renderPlayerLevelWidget(_userData)}
@@ -2771,6 +2850,7 @@ function renderMyTeam(container, raidTeam) {
   document.getElementById('btnAbrirMissions')?.addEventListener('click', () => {
     if (typeof window.missionsOpen === 'function') window.missionsOpen();
   });
+  document.getElementById('btnAbrirDiary')?.addEventListener('click', () => abrirDiary());
   document.getElementById('btnFecharPokedex')?.addEventListener('click', () =>
     document.getElementById('raidPokedexModal').classList.remove('show'));
   document.getElementById('raidPokedexModal')?.addEventListener('click', e => {
@@ -3556,17 +3636,21 @@ async function _promoverStandby() {
 }
 
 function renderBagGrid(container) {
-  const bag  = _userData?.raidBag || {};
+  const bag      = _userData?.raidBag       || {};
+  const heldBag  = _userData?.raidHeldItems || {};
   const grid = container ? container.querySelector('#raidBagGrid') : document.getElementById('raidBagGrid');
   if (!grid) return;
 
-  const comQtd = BAG_ITENS_ORDEM.filter(k => (bag[k] || 0) > 0);
-  if (comQtd.length === 0) {
+  const comQtd     = BAG_ITENS_ORDEM.filter(k => (bag[k] || 0) > 0);
+  const heldComQtd = Object.entries(HELD_ITEMS_DB).filter(([k]) => (heldBag[k] || 0) > 0);
+
+  if (comQtd.length === 0 && heldComQtd.length === 0) {
     grid.innerHTML = '<p class="raid-bag-vazia">Your bag is empty.</p>';
     return;
   }
 
-  grid.innerHTML = comQtd.map(key => {
+  // Itens normais
+  const normalHTML = comQtd.map(key => {
     const item = ITEMS_DB[key];
     if (!item) return '';
     const qty    = bag[key] || 0;
@@ -3577,6 +3661,20 @@ function renderBagGrid(container) {
       + '<span class="raid-bag-qty">x' + qty + '</span>'
       + '</div>';
   }).join('');
+
+  // Held items com tag dourada
+  const heldHTML = heldComQtd.map(([key, item]) => {
+    const qty      = heldBag[key] || 0;
+    const equipped = (_userData?.raidTeam || []).some(s => s.heldItem === key);
+    return '<div class="raid-bag-item raid-bag-item-held" data-held="' + key + '">'
+      + '<span class="raid-bag-held-tag">HELD</span>'
+      + '<img src="' + item.img + '" alt="' + item.name + '" class="raid-bag-img" onerror="this.style.opacity=\'0.4\'">'
+      + '<span class="raid-bag-nome">' + item.name + '</span>'
+      + '<span class="raid-bag-qty">' + (equipped ? '✓ Eq.' : 'x' + qty) + '</span>'
+      + '</div>';
+  }).join('');
+
+  grid.innerHTML = normalHTML + heldHTML;
 
   grid.querySelectorAll('.raid-bag-item.usavel').forEach(el => {
     el.addEventListener('click', () => abrirUsarItem(el.dataset.item));
@@ -3756,10 +3854,15 @@ function abrirHeldItemModal(slot) {
 
   const itemsHTML = available.length
     ? available.map(([key, item]) => {
-        const qty     = heldBag[key] || 0;
+        const qty      = heldBag[key] || 0;
         const equipado = slot.heldItem === key;
         return `<div class="held-modal-item ${equipado ? 'held-equipado' : ''}" data-key="${key}">
-          <div class="held-modal-icon">${item.icon}</div>
+          <div class="held-modal-icon">
+            <img src="${item.img}" alt="${item.name}"
+                 style="width:36px;height:36px;object-fit:contain;image-rendering:pixelated;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+            <span style="display:none;font-size:1.4rem">${item.icon}</span>
+          </div>
           <div class="held-modal-info">
             <span class="held-modal-name">${item.name} ${equipado ? '(Equipped)' : `×${qty}`}</span>
             <span class="held-modal-desc">${item.desc}</span>
@@ -4080,10 +4183,12 @@ function abrirModalStatus(slot) {
     + (() => {
         const hi     = slot.heldItem ? HELD_ITEMS_DB[slot.heldItem] : null;
         const hiName = hi ? hi.name : 'No item equipped';
-        const hiIcon = hi ? hi.icon : '➕';
         const hiDesc = hi ? hi.desc : 'Click to equip a held item.';
+        const hiIconHTML = hi
+          ? `<img src="${hi.img}" alt="${hi.name}" style="width:28px;height:28px;object-fit:contain;image-rendering:pixelated;" onerror="this.style.display='none';this.insertAdjacentText('afterend','${hi.icon}')">`
+          : '<span style="font-size:1.2rem">➕</span>';
         return '<div class="held-item-slot" id="heldItemSlot">'
-          + '<div class="held-item-icon">' + hiIcon + '</div>'
+          + '<div class="held-item-icon">' + hiIconHTML + '</div>'
           + '<div class="held-item-info">'
           + '<span class="held-item-name">' + hiName + '</span>'
           + '<span class="held-item-desc">' + hiDesc + '</span>'
@@ -4128,7 +4233,6 @@ function abrirModalStatus(slot) {
 
   document.getElementById('raidModalStatus').classList.add('show');
 
-  if (typeof window.aplicarBordaEquipada === 'function') window.aplicarBordaEquipada();
 
   const _isStandbyNav = slot.expiraEm !== undefined && slot.slot === undefined;
   const teamNav    = _userData?.raidTeam || [];

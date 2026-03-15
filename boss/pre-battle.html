@@ -289,6 +289,77 @@
     @media(max-width:900px){ .pb-arena{grid-template-columns:1fr} .pb-players-grid{grid-template-columns:repeat(2,1fr)} }
     @media(max-width:520px){ .pb-players-grid{grid-template-columns:1fr 1fr} }
 
+    /* ── Mobile: ≤ 640px ── */
+    @media(max-width:640px) {
+      /* Header: empilhar título e room ID verticalmente */
+      .pb-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 14px;
+      }
+      .pb-header-title {
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+      }
+      .pb-room-id {
+        width: 100%;
+        justify-content: space-between;
+        padding: 5px 10px;
+        font-size: 0.72rem;
+        gap: 6px;
+      }
+      .pb-room-id-val {
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+      }
+      .pb-copy-btn {
+        padding: 3px 8px;
+        font-size: 0.62rem;
+      }
+      .pb-status-label {
+        font-size: 0.65rem;
+      }
+      .pb-leave-btn {
+        align-self: flex-end;
+        padding: 5px 12px;
+        font-size: 0.68rem;
+      }
+
+      /* Timer bar */
+      .pb-timer-bar {
+        font-size: 0.72rem;
+        padding: 5px;
+      }
+      .pb-timer-bar b { font-size: 0.88rem; }
+
+      /* Main padding */
+      .pb-main { padding: 10px 12px 0; gap: 10px; }
+
+      /* Arena: boss menor */
+      .pb-boss-name  { font-size: 1.1rem; margin: 6px 0 4px; }
+      .pb-boss-img   { width: clamp(80px,22vw,120px) !important; }
+
+      /* Player cards: mais compactos */
+      .pb-player-card { padding: 10px 8px; gap: 6px; min-height: unset; }
+      .pb-player-nick { font-size: 0.7rem; }
+      .pb-poke-img    { width: 50px; height: 50px; }
+      .pb-poke-name   { font-size: 0.62rem; }
+      .pb-poke-lvl    { font-size: 0.6rem; }
+
+      /* Bag button */
+      .pb-bag-btn { font-size: 0.6rem; padding: 4px 8px; }
+
+      /* Players grid: forçar 2 colunas */
+      .pb-players-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+
+      /* Start button */
+      #pbReadyBtn {
+        font-size: 0.85rem;
+        padding: 12px 20px;
+      }
+    }
+
     .pb-poke-fainted { opacity: 0.7; border-color: rgba(200,0,0,0.35) !important; }
     .pb-fainted-tag {
       position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
@@ -1386,9 +1457,9 @@ window.abrirBagModal = function abrirBagModal() {
       const efeito = ITEM_CURA[key];
       const qty    = bag[key] || 0;
       const usable = !!efeito;
+      const onclk  = usable ? "usarItemPreBattle('" + key + "')" : 'void(0)';
       return '<div class="pb-bag-modal-item' + (usable ? '' : ' disabled') + '"'
-           + (usable ? ' data-item-key="' + key + '" style="cursor:pointer"' : '')
-           + '>'
+           + ' onclick="' + onclk + '">'
            + '<img src="../boss/img-items/' + key + '.png" onerror="this.style.opacity=\'0.3\'">'
            + '<div class="pb-bag-modal-item-info">'
            + '<div class="pb-bag-modal-item-name">' + nome + '</div>'
@@ -1397,15 +1468,6 @@ window.abrirBagModal = function abrirBagModal() {
            + '<div class="pb-bag-modal-item-qty">×' + qty + '</div>'
            + '</div>';
     }).join('');
-
-    // Event delegation — um único listener no container, sem onclick inline
-    itemsEl.querySelectorAll('[data-item-key]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const key = el.getAttribute('data-item-key');
-        if (key) usarItemPreBattle(key);
-      });
-    });
   }
 
   modal.classList.add('open');

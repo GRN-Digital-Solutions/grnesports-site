@@ -27,14 +27,48 @@ export async function initMissions(userId, db, userData) {
   if (!_userData.trainerStats)    _userData.trainerStats    = {};
   if (!_userData.achievements)    _userData.achievements    = {};
   if (!_userData.unlockedBorders) _userData.unlockedBorders = ['default'];
-  if (!_userData.equippedBorder)  _userData.equippedBorder  = 'default';
+
 
   window.missionsTrack  = missionsTrack;
   window.missionsRecalc = missionsRecalc;
-  window.missionsOpen   = abrirPainelConquistas;
+  // missionsOpen aceita aba e slotNum opcional
+  window.missionsOpen   = (tab, slotNum) => abrirPainelConquistas(tab || 'achievements', slotNum);
 
-  aplicarBordaEquipada();
   missionsRecalcSilent();
+
+  // Aplicar cosmético equipado ao carregar — aguarda o DOM estar pronto
+  // (boss-raid.js renderiza o container logo depois do initMissions)
+  setTimeout(() => _aplicarCosmético(_userData?.equippedBorder || 'default'), 200);
+
+  // ── Reparar cosméticos perdidos ────────────────────────────
+  // Se um achievement foi claimed (= true) mas o cosmético da reward
+  // não está em unlockedBorders (bug de versão anterior), conceder agora.
+  {
+    const bordersSet    = new Set(_userData.unlockedBorders || ['default']);
+    const achievements  = _userData.achievements || {};
+    let   repaired      = false;
+    for (const [achId, ach] of Object.entries(ACHIEVEMENTS)) {
+      for (const tier of (ach.tiers || [])) {
+        const chave = `${achId}_tier${tier.tier}`;
+        if (achievements[chave] === true && tier.reward?.cosmetic) {
+          if (!bordersSet.has(tier.reward.cosmetic)) {
+            bordersSet.add(tier.reward.cosmetic);
+            repaired = true;
+            console.log('[Missions] Reparando cosmético perdido:', tier.reward.cosmetic);
+          }
+        }
+      }
+    }
+    if (repaired) {
+      _userData.unlockedBorders = Array.from(bordersSet);
+      import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js')
+        .then(({ doc, updateDoc }) =>
+          updateDoc(doc(_db, 'usuarios', _userId), {
+            unlockedBorders: _userData.unlockedBorders,
+          })
+        ).catch(e => console.warn('[Missions] repair save:', e));
+    }
+  }
 
   // Consumir resultado de raid gravado pelo battle.js (página separada)
   await _consumirRaidResult();
@@ -235,7 +269,7 @@ async function claimarRecompensa(achId, tierNum) {
     const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
     const payload = {
       achievements:    JSON.parse(JSON.stringify(_userData.achievements)),
-      unlockedBorders: JSON.parse(JSON.stringify(_userData.unlockedBorders)),
+      unlockedBorders: JSON.parse(JSON.stringify(_userData.unlockedBorders || ['default'])),
       raidBag:         JSON.parse(JSON.stringify(bag)),
       playerXP:        _userData.playerXP    || 0,
       playerLevel:     _userData.playerLevel || 1,
@@ -260,39 +294,27 @@ async function _salvarStats() {
   });
 }
 
-export async function salvarBordaEquipada(cosmeticId) {
-  if (!_userId || !_db) return;
-  _userData.equippedBorder = cosmeticId;
-  const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
-  await updateDoc(doc(_db, 'usuarios', _userId), { equippedBorder: cosmeticId });
-  aplicarBordaEquipada();
-}
 
 // ============================================================
 // BORDA COSMETICA
 // ============================================================
-export function aplicarBordaEquipada() {
-  const cosmeticId = _userData?.equippedBorder || 'default';
-  const cosmetic   = COSMETICS[cosmeticId] || COSMETICS['default'];
-  const modais = document.querySelectorAll('.raid-modal-content.raid-modal-status-content');
-  modais.forEach(el => {
-    Object.values(COSMETICS).forEach(c => { if (c.cssClass) el.classList.remove(c.cssClass); });
-    if (cosmetic.cssClass) el.classList.add(cosmetic.cssClass);
-  });
-}
-window.aplicarBordaEquipada = aplicarBordaEquipada;
 
 // ============================================================
 // PAINEL PRINCIPAL
 // ============================================================
-export function abrirPainelConquistas() {
+export function abrirPainelConquistas(defaultTab = 'achievements', slotNum = null) {
   document.getElementById('missionsModal')?.remove();
 
   const stats        = _userData?.trainerStats    || {};
   const achievements = _userData?.achievements    || {};
   const unlocked     = new Set(_userData?.unlockedBorders || ['default']);
-  const equipped     = _userData?.equippedBorder  || 'default';
   const playerLevel  = _userData?.playerLevel     || 1;
+
+  // Cosmético: se veio de um slot específico, usa o equippedBorder do slot
+  const slotAtual  = slotNum !== null
+    ? (_userData?.raidTeam || []).find(s => s.slot === slotNum)
+    : null;
+  const equipped   = slotAtual?.equippedBorder || _userData?.equippedBorder || 'default';
 
   // ── Cosmetics tab ──────────────────────────────────────────
   const cosmeticCards = Object.values(COSMETICS).map(c => {
@@ -420,6 +442,14 @@ export function abrirPainelConquistas() {
   document.body.appendChild(modal);
   setTimeout(() => modal.classList.add('mss-show'), 30);
 
+  // Ativar aba padrão se não for achievements
+  if (defaultTab === 'cosmetics') {
+    modal.querySelectorAll('.mss-tab').forEach(b => b.classList.remove('mss-tab-active'));
+    modal.querySelector('[data-tab="cosmetics"]')?.classList.add('mss-tab-active');
+    document.getElementById('mssTabAchievements')?.classList.add('mss-panel-hidden');
+    document.getElementById('mssTabCosmetics')?.classList.remove('mss-panel-hidden');
+  }
+
   document.getElementById('mssClose').addEventListener('click', () => _fecharModal());
   modal.addEventListener('click', e => { if (e.target === modal) _fecharModal(); });
 
@@ -445,12 +475,34 @@ export function abrirPainelConquistas() {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       btn.textContent = '...';
-      await salvarBordaEquipada(btn.dataset.cosmeticId);
+      const cosId = btn.dataset.cosmeticId;
+      _userData.equippedBorder = cosId;
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+        await updateDoc(doc(_db, 'usuarios', _userId), { equippedBorder: cosId });
+      } catch(e) { console.warn('[Cosmetics] save:', e); }
+      _aplicarCosmético(cosId);  // aplicar imediatamente na UI
       _fecharModal();
-      abrirPainelConquistas();
+      abrirPainelConquistas('cosmetics');
     });
   });
 }
+
+// ── Aplicar classe CSS do cosmético no #bossRaidContainer ────
+function _aplicarCosmético(cosmeticId) {
+  const el = document.getElementById('bossRaidContainer');
+  if (!el) return;
+  // Remover todas as classes cosméticas existentes
+  el.className = el.className.replace(/\bcosmetic-border-\S+/g, '').trim();
+  if (cosmeticId && cosmeticId !== 'default') {
+    const cosmetic = COSMETICS[cosmeticId];
+    if (cosmetic?.cssClass) el.classList.add(cosmetic.cssClass);
+  }
+}
+// Expor para boss-raid.js chamar no init após renderizar
+window.aplicarBordaEquipada = function() {
+  _aplicarCosmético(_userData?.equippedBorder || 'default');
+};
 
 function _fecharModal() {
   const m = document.getElementById('missionsModal');
@@ -526,6 +578,46 @@ function _mostrarToastCosmetico(cosmeticId) {
   setTimeout(() => t.classList.add('mss-toast-show'), 100);
   setTimeout(() => { t.classList.remove('mss-toast-show'); setTimeout(() => t.remove(), 450); }, 5500);
 }
+
+export function mostrarLevelUpTrainer(novoNivel, rewardItens) {
+  // Overlay centralizado de level up do Trainer — chamado após boss raid
+  document.getElementById('trainerLevelUpOverlay')?.remove();
+
+  const itensHTML = rewardItens
+    ? Object.entries(rewardItens).map(([k, v]) => {
+        const item = (typeof ITEMS_DB !== 'undefined' && ITEMS_DB[k]) || null;
+        const img  = item ? `<img src="${item.img}" style="width:22px;height:22px;object-fit:contain;image-rendering:pixelated;vertical-align:middle">` : '📦';
+        return `<div class="lu-reward-chip">${img} <span>×${v} ${item?.name || k.replace(/_/g,' ')}</span></div>`;
+      }).join('')
+    : '';
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'trainerLevelUpOverlay';
+  overlay.className = 'lu-overlay';
+  overlay.innerHTML = `
+    <div class="lu-box">
+      <div class="lu-burst">✦</div>
+      <div class="lu-label">TRAINER LEVEL UP!</div>
+      <div class="lu-nivel">Level ${novoNivel}</div>
+      ${itensHTML ? `<div class="lu-rewards-label">Rewards:</div><div class="lu-rewards-grid">${itensHTML}</div>` : ''}
+      <button class="lu-ok-btn" id="luOkBtn">Continue!</button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.classList.add('lu-show'), 30);
+  document.getElementById('luOkBtn').addEventListener('click', () => {
+    overlay.classList.remove('lu-show');
+    setTimeout(() => overlay.remove(), 400);
+  });
+  // Auto-fechar após 6 segundos
+  setTimeout(() => {
+    if (document.getElementById('trainerLevelUpOverlay')) {
+      overlay.classList.remove('lu-show');
+      setTimeout(() => overlay.remove(), 400);
+    }
+  }, 6000);
+}
+window.mostrarLevelUpTrainer = mostrarLevelUpTrainer;
 
 // ============================================================
 // FIM — missions.js

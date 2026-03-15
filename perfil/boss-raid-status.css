@@ -458,6 +458,320 @@
 }
 .raid-pokedex-btn:hover { background: rgba(255,117,0,0.25); }
 
+/* Variante roxa — Missions (agora amarelo padrão) */
+.raid-pokedex-btn-missions {
+  background: rgba(255,117,0,0.12);
+  border-color: rgba(255,117,0,0.35);
+  color: #ffad00;
+}
+.raid-pokedex-btn-missions:hover { background: rgba(255,117,0,0.25); }
+
+/* Variante Diary — também amarelo padrão */
+.raid-pokedex-btn-diary {
+  background: rgba(255,117,0,0.12);
+  border-color: rgba(255,117,0,0.35);
+  color: #ffad00;
+}
+.raid-pokedex-btn-diary:hover { background: rgba(255,117,0,0.25); }
+
+/* Variante Cosmetics — também amarelo padrão */
+.raid-pokedex-btn-cosmetics {
+  background: rgba(255,117,0,0.12);
+  border-color: rgba(255,117,0,0.35);
+  color: #ffad00;
+}
+.raid-pokedex-btn-cosmetics:hover { background: rgba(255,117,0,0.25); }
+
+/* Held item tag na bag */
+.raid-bag-item-held {
+  border-color: rgba(255,210,0,0.4) !important;
+  background: rgba(255,210,0,0.06) !important;
+  position: relative;
+}
+.raid-bag-held-tag {
+  position: absolute; top: 3px; right: 3px;
+  background: rgba(255,180,0,0.2);
+  border: 1px solid rgba(255,180,0,0.5);
+  color: #ffcc44; font-size: 0.45rem; font-weight: 900;
+  padding: 1px 4px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ── DIARY MODAL ────────────────────────────────────────── */
+.diary-modal-box {
+  max-width: 540px;
+}
+.diary-modal-body {
+  padding: 12px 16px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 72vh; overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(78,205,196,0.3) transparent;
+}
+.diary-modal-body::-webkit-scrollbar { width: 4px; }
+.diary-modal-body::-webkit-scrollbar-thumb { background: rgba(78,205,196,0.3); border-radius: 99px; }
+.diary-empty {
+  text-align: center; padding: 32px 16px;
+  font-size: 0.8rem; color: #555;
+}
+.diary-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px; padding: 10px 12px;
+  animation: diary-fadein 0.3s ease both;
+}
+@keyframes diary-fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.diary-card-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.diary-boss-img {
+  width: 40px; height: 40px; object-fit: contain;
+  image-rendering: pixelated; flex-shrink: 0;
+}
+.diary-card-title {
+  display: flex; flex-direction: column; flex: 1;
+}
+.diary-boss-name { font-size: 0.82rem; font-weight: 700; color: #eee; }
+.diary-boss-lv   { font-size: 0.65rem; color: #888; }
+.diary-caught-badge {
+  font-size: 0.62rem; font-weight: 700;
+  background: rgba(46,204,113,0.15);
+  border: 1px solid rgba(46,204,113,0.35);
+  color: #2ecc71; padding: 2px 7px; border-radius: 6px;
+  white-space: nowrap;
+}
+.diary-fled-badge {
+  font-size: 0.62rem; font-weight: 700;
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  color: #e74c3c; padding: 2px 7px; border-radius: 6px;
+  white-space: nowrap;
+}
+.diary-date {
+  font-size: 0.58rem; color: #555;
+  white-space: nowrap; margin-left: auto;
+}
+.diary-rewards {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.diary-drop-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 3px 7px 3px 4px;
+  font-size: 0.65rem; color: #ccc; position: relative;
+}
+.diary-drop-img {
+  width: 18px; height: 18px;
+  object-fit: contain; image-rendering: pixelated;
+}
+.diary-drop-label { font-weight: 600; }
+.diary-drop-qty   { color: #ffad00; font-weight: 800; }
+.diary-drop-held  { border-color: rgba(255,180,0,0.35); background: rgba(255,210,0,0.07); }
+.diary-held-tag {
+  position: absolute; top: -5px; right: -4px;
+  background: rgba(255,180,0,0.25);
+  border: 1px solid rgba(255,180,0,0.5);
+  color: #ffcc44; font-size: 0.4rem; font-weight: 900;
+  padding: 0px 3px; border-radius: 3px;
+  text-transform: uppercase;
+}
+.diary-drop-xp   { background: rgba(255,215,0,0.08); border-color: rgba(255,215,0,0.25); color: #ffe066; }
+.diary-drop-leal { background: rgba(231,76,60,0.08);  border-color: rgba(231,76,60,0.25);  color: #e88; }
+
+/* ── TRAINER LEVEL UP OVERLAY ────────────────────────────── */
+.lu-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.82);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.lu-overlay.lu-show { opacity: 1; pointer-events: all; }
+.lu-box {
+  background: linear-gradient(145deg, rgba(14,14,22,0.99), rgba(20,14,36,0.99));
+  border: 2px solid rgba(255,210,0,0.55);
+  border-radius: 20px; padding: 32px 28px 24px;
+  max-width: 360px; width: 90vw;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(255,210,0,0.15), 0 12px 40px rgba(0,0,0,0.7);
+  transform: scale(0.85);
+  transition: transform 0.35s cubic-bezier(0.22,1,0.36,1);
+}
+.lu-overlay.lu-show .lu-box { transform: scale(1); }
+.lu-burst {
+  font-size: 2.8rem; animation: lu-spin 3s linear infinite;
+  display: block; color: #ffe066;
+}
+@keyframes lu-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.lu-label {
+  font-size: 0.72rem; letter-spacing: 3px; text-transform: uppercase;
+  color: #ffcc66; font-weight: 800; margin: 8px 0 4px;
+}
+.lu-nivel {
+  font-size: 3rem; font-weight: 900; color: #fff;
+  text-shadow: 0 0 24px rgba(255,220,0,0.8);
+  line-height: 1.1;
+}
+.lu-rewards-label {
+  font-size: 0.65rem; color: #888; margin: 12px 0 6px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.lu-rewards-grid {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  margin-bottom: 16px;
+}
+.lu-reward-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,210,0,0.10);
+  border: 1px solid rgba(255,210,0,0.30);
+  border-radius: 8px; padding: 4px 10px;
+  font-size: 0.7rem; color: #ffe066; font-weight: 700;
+}
+.lu-ok-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  border: none; color: #fff; border-radius: 10px;
+  padding: 10px 32px; font-size: 0.82rem;
+  font-weight: 800; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.lu-ok-btn:hover { opacity: 0.85; }
+
+@media (max-width: 900px) {
+  .diary-modal-box     { max-width: 98vw; }
+  .diary-card-header   { flex-wrap: wrap; }
+  .diary-date          { margin-left: 0; order: 5; width: 100%; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   COSMÉTICOS — bordas CSS aplicadas no #bossRaidContainer
+   Cada classe corresponde a cssClass em cosmetics-config.js
+   ══════════════════════════════════════════════════════════════ */
+
+/* Silver Frame — borda metálica cinza */
+#bossRaidContainer.cosmetic-border-silver {
+  border-color: #b0b8c8 !important;
+  box-shadow: 0 0 12px rgba(176,184,200,0.25), inset 0 0 20px rgba(176,184,200,0.05) !important;
+}
+#bossRaidViewContainer.cosmetic-border-silver {
+  border-color: #b0b8c8 !important;
+  box-shadow: 0 0 12px rgba(176,184,200,0.25), inset 0 0 20px rgba(176,184,200,0.05) !important;
+}
+
+/* Verdant Frame — borda verde pulsante */
+#bossRaidContainer.cosmetic-border-green {
+  border-color: #2ecc71 !important;
+  box-shadow: 0 0 14px rgba(46,204,113,0.35), inset 0 0 20px rgba(46,204,113,0.06) !important;
+  animation: cosmetic-pulse-green 2.5s ease-in-out infinite;
+}
+#bossRaidViewContainer.cosmetic-border-green {
+  border-color: #2ecc71 !important;
+  box-shadow: 0 0 14px rgba(46,204,113,0.35), inset 0 0 20px rgba(46,204,113,0.06) !important;
+  animation: cosmetic-pulse-green 2.5s ease-in-out infinite;
+}
+@keyframes cosmetic-pulse-green {
+  0%, 100% { box-shadow: 0 0 14px rgba(46,204,113,0.35), inset 0 0 20px rgba(46,204,113,0.06); }
+  50%       { box-shadow: 0 0 26px rgba(46,204,113,0.65), inset 0 0 30px rgba(46,204,113,0.12); }
+}
+
+/* Ocean Frame — borda azul pulsante */
+#bossRaidContainer.cosmetic-border-blue {
+  border-color: #3498db !important;
+  box-shadow: 0 0 14px rgba(52,152,219,0.35), inset 0 0 20px rgba(52,152,219,0.06) !important;
+  animation: cosmetic-pulse-blue 2.5s ease-in-out infinite;
+}
+#bossRaidViewContainer.cosmetic-border-blue {
+  border-color: #3498db !important;
+  box-shadow: 0 0 14px rgba(52,152,219,0.35), inset 0 0 20px rgba(52,152,219,0.06) !important;
+  animation: cosmetic-pulse-blue 2.5s ease-in-out infinite;
+}
+@keyframes cosmetic-pulse-blue {
+  0%, 100% { box-shadow: 0 0 14px rgba(52,152,219,0.35), inset 0 0 20px rgba(52,152,219,0.06); }
+  50%       { box-shadow: 0 0 28px rgba(52,152,219,0.7), inset 0 0 32px rgba(52,152,219,0.12); }
+}
+
+/* Flame Frame — borda laranja/vermelha com animação de fogo */
+#bossRaidContainer.cosmetic-border-fire {
+  border-color: #e74c3c !important;
+  animation: cosmetic-fire 1.2s ease-in-out infinite;
+}
+#bossRaidViewContainer.cosmetic-border-fire {
+  border-color: #e74c3c !important;
+  animation: cosmetic-fire 1.2s ease-in-out infinite;
+}
+@keyframes cosmetic-fire {
+  0%   { box-shadow: 0 0 12px rgba(231,76,60,0.5),  0 0 24px rgba(230,126,34,0.3); border-color: #e74c3c !important; }
+  33%  { box-shadow: 0 0 20px rgba(230,126,34,0.7),  0 0 36px rgba(231,76,60,0.4); border-color: #e67e22 !important; }
+  66%  { box-shadow: 0 0 16px rgba(231,76,60,0.6),   0 0 28px rgba(241,196,15,0.3); border-color: #f39c12 !important; }
+  100% { box-shadow: 0 0 12px rgba(231,76,60,0.5),  0 0 24px rgba(230,126,34,0.3); border-color: #e74c3c !important; }
+}
+
+/* Rainbow Frame — gradiente rotativo */
+#bossRaidContainer.cosmetic-border-rainbow {
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  position: relative;
+}
+#bossRaidViewContainer.cosmetic-border-rainbow {
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  position: relative;
+}
+#bossRaidContainer.cosmetic-border-rainbow::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: linear-gradient(270deg,#e74c3c,#e67e22,#f1c40f,#2ecc71,#3498db,#9b59b6,#e74c3c);
+  background-size: 400% 400%;
+  animation: cosmetic-rainbow 4s linear infinite;
+  z-index: -1;
+}
+#bossRaidViewContainer.cosmetic-border-rainbow::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: linear-gradient(270deg,#e74c3c,#e67e22,#f1c40f,#2ecc71,#3498db,#9b59b6,#e74c3c);
+  background-size: 400% 400%;
+  animation: cosmetic-rainbow 4s linear infinite;
+  z-index: -1;
+}
+@keyframes cosmetic-rainbow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
+}
+
+/* Shadow Frame — borda roxa pulsante */
+#bossRaidContainer.cosmetic-border-dark {
+  border-color: #9b59b6 !important;
+  animation: cosmetic-pulse-dark 3s ease-in-out infinite;
+}
+#bossRaidViewContainer.cosmetic-border-dark {
+  border-color: #9b59b6 !important;
+  animation: cosmetic-pulse-dark 3s ease-in-out infinite;
+}
+@keyframes cosmetic-pulse-dark {
+  0%, 100% { box-shadow: 0 0 16px rgba(155,89,182,0.4), inset 0 0 24px rgba(155,89,182,0.08); }
+  50%       { box-shadow: 0 0 32px rgba(155,89,182,0.75), inset 0 0 36px rgba(155,89,182,0.15); }
+}
+
+/* Golden Frame — borda dourada animada */
+#bossRaidContainer.cosmetic-border-gold {
+  border-color: #f39c12 !important;
+  animation: cosmetic-gold 1.8s ease-in-out infinite;
+}
+#bossRaidViewContainer.cosmetic-border-gold {
+  border-color: #f39c12 !important;
+  animation: cosmetic-gold 1.8s ease-in-out infinite;
+}
+@keyframes cosmetic-gold {
+  0%   { box-shadow: 0 0 16px rgba(243,156,18,0.5),  0 0 32px rgba(255,215,0,0.25); border-color: #f39c12 !important; }
+  50%  { box-shadow: 0 0 28px rgba(255,215,0,0.85),  0 0 48px rgba(243,156,18,0.45); border-color: #ffe066 !important; }
+  100% { box-shadow: 0 0 16px rgba(243,156,18,0.5),  0 0 32px rgba(255,215,0,0.25); border-color: #f39c12 !important; }
+}
+
 .raid-slots-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);

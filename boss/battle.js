@@ -38,6 +38,7 @@ const MOVES_DB = {
   hyper_voice:  {name:'Hyper Voice',   type:'normal',  cat:'special',  power:90,  acc:100, pp:10},
   swift:        {name:'Swift',         type:'normal',  cat:'special',  power:60,  acc:null,pp:20},
   water_gun:    {name:'Water Gun',     type:'water',   cat:'special',  power:40,  acc:100, pp:25},
+  mud_slap:     {name:'Mud-Slap',      type:'ground',  cat:'special',  power:20,  acc:100, pp:10, effect:'debuff', stat:'acc', stages:-1, effectChance:100},
   bubble:       {name:'Bubble',        type:'water',   cat:'special',  power:40,  acc:100, pp:30},
   surf:         {name:'Surf',          type:'water',   cat:'special',  power:90,  acc:100, pp:15},
   hydro_pump:   {name:'Hydro Pump',    type:'water',   cat:'special',  power:110, acc:80,  pp:5 },
@@ -1128,7 +1129,7 @@ async function processarStatusDanoPlayer() {
   const hpMax = me.hpMax || 1; const pName = cap(me.pokemon);
   if (status === 'poison') { dmg = Math.max(1, Math.floor(hpMax / 8)); msg = `${getNick()}'s ${pName} is hurt by poison! (-${dmg} HP)`; }
   else if (status === 'toxic') { const toxTurn = (me.toxicTurns||0)+1; dmg = Math.max(1, Math.floor(hpMax/16*toxTurn)); msg = `${getNick()}'s ${pName} is badly hurt by poison! (-${dmg} HP)`; await update(_battleRef, { [`players/${_uid}/toxicTurns`]: toxTurn }); }
-  else if (status === 'burn') { dmg = Math.max(1, Math.floor(hpMax / 8)); msg = `${getNick()}'s ${pName} is hurt by its burn! (-${dmg} HP)`; }
+  else if (status === 'burn') { dmg = Math.max(1, Math.floor(hpMax / 16)); msg = `${getNick()}'s ${pName} is hurt by its burn! (-${dmg} HP)`; }
   const newHp = Math.max(0, me.hp - dmg);
   await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: newHp });
   showPlayerFloat(_uid, `-${dmg}`, 'super');
@@ -1674,6 +1675,7 @@ window.btOpenBag = function(){
     ether:        { name:'Ether',        img:'ether',         isEther:true, isBall:false },
     antidote:     { name:'Antidote',     img:'antidote',      isBall:false },
     awakening:    { name:'Awakening',    img:'awakening',     isBall:false },
+    burn_heal:    { name:'Burn Heal',    img:'burn_heal',     isBall:false },
     max_revive:   { name:'Max Revive',   img:'max_revive',    revive:true, isBall:false },
   };
 
@@ -2007,9 +2009,13 @@ window.btUsarGolpe = async function(idx, moveKey){
   }
 
   const myStats  = calcStats(me.pokemon, me.ivs, me.nivel||1, me.nature||'Hardy', me.evs);
-  // Aplicar stages do player (buffs/debuffs acumulados)
+  const myAbility = me.ability || '';
+
+  // ── Burn: reduz ATK físico em 50% ────────────────────────
+  let myAtkBase = move.cat === 'physical' ? myStats.atk : myStats.spa;
+  if (me.status === 'burn' && move.cat === 'physical') myAtkBase = Math.floor(myAtkBase * 0.5);
   const myAtkEff = getEffStat(
-    move.cat === 'physical' ? myStats.atk : myStats.spa,
+    myAtkBase,
     move.cat === 'physical' ? 'atk' : 'spa',
     _playerStages[_uid] || {}
   );
@@ -2021,7 +2027,25 @@ window.btUsarGolpe = async function(idx, moveKey){
   );
   const myStatsEff   = { ...myStats,   atk: move.cat==='physical'?myAtkEff:myStats.atk, spa: move.cat==='special'?myAtkEff:myStats.spa };
   const bossStatsEff = { ..._bossStats, def: move.cat==='physical'?bossDefEff:_bossStats.def, spd: move.cat==='special'?bossDefEff:_bossStats.spd };
-  const res      = calcDano(myStatsEff, bossStatsEff, move, pokeTipos, bossTipos, me.nivel||1);
+  const res = calcDano(myStatsEff, bossStatsEff, move, pokeTipos, bossTipos, me.nivel||1);
+
+  // ── Accuracy: stage acc + Compound Eyes (+30%) ────────────
+  const accStageMult = stageMult(_playerStages[_uid]?.acc || 0);
+  const accAbilMult  = myAbility === 'compound_eyes' ? 1.30 : 1.0;
+  const finalAcc     = move.acc != null
+    ? Math.min(100, move.acc * accStageMult * accAbilMult)
+    : null; // null = sempre acerta (ex: Swift)
+  if (finalAcc !== null && Math.random() * 100 > finalAcc) {
+    showBossFloat('Missed!', 'miss');
+    await logAction(`${getNick()}'s ${cap(me.pokemon)} used ${move.name}! But it missed!`);
+    await processarStatusDanoPlayer();
+    await processarHeldItemEndTurn();
+    await avancarTurno();
+    return;
+  }
+
+  // ── Tinted Lens: dobra dano de golpes NVE (eff < 1) ──────
+  const tintedMult = (myAbility === 'tinted_lens' && res.eff > 0 && res.eff < 1) ? 2.0 : 1.0;
 
   // ── Life Orb: +30% dano, custa 1/10 HP por ataque ────────────
   const hasLifeOrb = me.heldItem === 'life_orb';
@@ -2039,7 +2063,7 @@ window.btUsarGolpe = async function(idx, moveKey){
   }
   const lifeOrbMult = hasLifeOrb ? 1.3 : 1.0;
 
-  const dano     = Math.min(Math.floor(res.dmg * lifeOrbMult * heldBoostMult), bossHp);
+  const dano     = Math.min(Math.floor(res.dmg * lifeOrbMult * heldBoostMult * tintedMult), bossHp);
   const newBossHp= Math.max(0, bossHp - dano);
 
   // Float de dano
@@ -2083,6 +2107,15 @@ window.btUsarGolpe = async function(idx, moveKey){
         _bossStatus.paralyzed = true;
         showBossFloat('⚡ Paralyzed!', 'miss');
         logTxt += ' The boss was paralyzed!';
+      } else if (eff2 === 'debuff' && move.stat && move.stages) {
+        // Damaging move com secondary stat debuff no boss (ex: Mud-Slap -1 acc)
+        const variou = applyBossStage(move.stat, move.stages);
+        if (variou) {
+          const statLabel = { acc:'Accuracy', def:'Defense', spd:'Sp.Def', spe:'Speed', atk:'Attack', spa:'Sp.Atk' }[move.stat] || move.stat;
+          const delta = move.stages < 0 ? move.stages : `+${move.stages}`;
+          showBossFloat(`${statLabel} ${delta}`, 'debuff');
+          logTxt += ` The boss's ${statLabel} fell!`;
+        }
       }
     }
   }
@@ -2172,6 +2205,7 @@ window.btUsarItem = async function(itemKey){
     revive:{name:'Revive',revive:true},
     antidote:{name:'Antidote',cureStatus:'poison'},
     awakening:{name:'Awakening',cureStatus:'sleep'},
+    burn_heal:{name:'Burn Heal',cureStatus:'burn'},
   };
 
   const info = ITEM_INFO[itemKey];
@@ -2242,6 +2276,8 @@ window.btUsarItem = async function(itemKey){
         ? `${cap(me.pokemon)} is not poisoned!`
         : info.cureStatus === 'sleep'
         ? `${cap(me.pokemon)} is not asleep!`
+        : info.cureStatus === 'burn'
+        ? `${cap(me.pokemon)} is not burned!`
         : `${cap(me.pokemon)} has no status condition!`;
       setMsg(statusMsg);
       _actionDone = false;
@@ -2252,7 +2288,9 @@ window.btUsarItem = async function(itemKey){
       status: null,
       sleepTurns: 0,
     });
-    const cureMsg = info.cureStatus === 'sleep' ? 'woke up' : 'was cured of poison';
+    const cureMsg = info.cureStatus === 'sleep' ? 'woke up'
+      : info.cureStatus === 'burn' ? 'was healed of its burn'
+      : 'was cured of poison';
     showPlayerFloat(_uid, '✨', 'heal');
     await logAction(`${getNick()} used ${info.name}! ${cap(me.pokemon)} ${cureMsg}!`);
     // full_restore também cura HP
@@ -2524,7 +2562,6 @@ async function bossAtaca(){
   let logParts  = [`Boss used ${move.name}!`];
 
   // ── Status moves do boss com target em players ────────────
-  // (sleep_powder, hypnosis, poison_powder, etc.)
   if (move.cat === 'status' && move.target !== 'self') {
     const eff = move.effect || null;
     for (const targetUid of targets) {
@@ -2535,6 +2572,11 @@ async function bossAtaca(){
       const hit = Math.random() * 100 <= acc;
       if (!hit) {
         logParts.push(`But it missed ${p?.nick || 'Player'}!`);
+        continue;
+      }
+      // Shield Dust: bloqueia status moves do boss (exceto debuffs de stat que vêm de 'debuff')
+      if (pAbility === 'shield_dust' && ['sleep','poison','toxic','paralysis','burn','confusion'].includes(eff)) {
+        logParts.push(`${cap(p.pokemon)}'s Shield Dust blocked the effect!`);
         continue;
       }
       if (eff === 'sleep') {
@@ -2751,7 +2793,10 @@ async function bossAtaca(){
         const eff2 = move.effect;
         const pAbility = p.ability || '';
         const curStatus = p.status || '';
-        if (eff2 === 'sleep' && pAbility === 'insomnia') {
+        // Shield Dust: bloqueia TODOS os secondary effects de golpes inimigos
+        if (pAbility === 'shield_dust') {
+          logParts.push(`${cap(p.pokemon)}'s Shield Dust blocked the secondary effect!`);
+        } else if (eff2 === 'sleep' && pAbility === 'insomnia') {
           logParts.push(`${cap(p.pokemon)}'s Insomnia blocked sleep!`);
         } else if (eff2 === 'sleep' && !curStatus) {
           const sleepTurns = move.turns || Math.floor(Math.random()*3)+2;
@@ -3219,6 +3264,7 @@ async function mostrarDrops(){
     }
     bossSlot = {
       slot:        proxSlot,
+      pokemonId:   Date.now().toString(36) + Math.random().toString(36).slice(2, 6), // ID único permanente
       pokemon:     _bossPokeKey,
       nivel:       1,
       xp:          0,
@@ -3232,7 +3278,7 @@ async function mostrarDrops(){
       evs:      { hp:0, atk:0, def:0, spa:0, spd:0, spe:0 },
       evPoints: 0,
       ivs:      { hp:Math.floor(Math.random()*32), atk:Math.floor(Math.random()*32), def:Math.floor(Math.random()*32), spa:Math.floor(Math.random()*32), spd:Math.floor(Math.random()*32), spe:Math.floor(Math.random()*32) },
-      hpAtual:  null, // será calculado pelo perfil
+      hpAtual:  null,
       shiny:    bossShiny,
     };
     // Verificar se o time está cheio (6 pokémons)
@@ -3251,17 +3297,31 @@ async function mostrarDrops(){
 
   // Gravar no Firestore
   try {
+    // ── Diary: registrar entrada desta raid (últimas 5) ──────
+    const diaryEntry = {
+      ts:      Date.now(),
+      boss:    _bossNome || '?',
+      nivel:   _bossData?.nivel || 10,
+      caught,
+      shiny:   caught && !!bossSlot?.shiny,
+      drops:   Object.entries(drops.itens).map(([k, v]) => ({ item: k, qty: v })),
+      xp:      drops.xp,
+      lealdade: drops.lealdade,
+    };
+    const raidDiary = [diaryEntry, ...(_userData?.raidDiary || [])].slice(0, 5);
+
     const fsUpdate = {
       raidBag:        newBag,
       raidHeldItems:  newHeldItems,
       raidTeam:       JSON.parse(JSON.stringify(novoTeam)),
+      raidDiary:      raidDiary,
       ...(caught ? { pokedex: arrayUnion(_bossNome.toLowerCase()) } : {}),
     };
     if (_bossStandbySlot) {
       fsUpdate.raidStandby = JSON.parse(JSON.stringify(_bossStandbySlot));
     }
     await updateDoc(doc(fsdb,'usuarios',_uid), fsUpdate);
-    if (_userData){ _userData.raidBag = newBag; _userData.raidHeldItems = newHeldItems; _userData.raidTeam = novoTeam; }
+    if (_userData){ _userData.raidBag = newBag; _userData.raidHeldItems = newHeldItems; _userData.raidTeam = novoTeam; _userData.raidDiary = raidDiary; }
   } catch(e){ console.error('[drops] Firestore error:', e); }
 
   // ── Renderizar popup ──

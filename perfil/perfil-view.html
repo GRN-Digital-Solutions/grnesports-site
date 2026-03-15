@@ -1386,10 +1386,24 @@ async function carregarBuildsUsuario(uid) {
 
   // ── Render grid de slots ───────────────────────────────────────────────
   function renderizarRaidTeamView(userData) {
-    const team   = userData?.raidTeam   || [];
-    const status = userData?.raidStatus || null;
+    const team   = userData?.raidTeam   || [];\n    const status = userData?.raidStatus || null;
     if(!team.length || status !== 'active') return;
     document.getElementById('rv-section').style.display = '';
+
+    // ── Aplicar cosmético do dono do perfil ──────────────────
+    // O visitante vê o mesmo frame que o dono equipou
+    const container = document.getElementById('bossRaidViewContainer');
+    if (container) {
+      // Remover classes cosméticas anteriores
+      container.className = container.className.replace(/\bcosmetic-border-\S+/g, '').trim();
+      const equippedBorder = userData?.equippedBorder;
+      if (equippedBorder && equippedBorder !== 'default') {
+        // A cssClass segue o padrão: 'cosmetic-border-' + ID sem 'border_'
+        // ex: 'border_silver' → 'cosmetic-border-silver'
+        const cssClass = 'cosmetic-border-' + equippedBorder.replace('border_', '');
+        container.classList.add(cssClass);
+      }
+    }
 
     // Pokedex do visitante logado (currentUser)
     _rvVisitorPokedex = new Set(Array.isArray(currentUser?._pokedex) ? currentUser._pokedex : []);
