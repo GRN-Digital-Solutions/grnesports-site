@@ -2659,7 +2659,7 @@ function abrirModalInfo() {
     return `<div class="info-boss-card">
       <div class="info-boss-header">
         <img class="info-boss-sprite" src="${b.sprite}" alt="${b.nome}"
-             onerror="this.src='/boss/img-pokeicon/${b.nome.toLowerCase()}.png'">
+             onerror="this.src='/perfil/img-pokeicon/${b.nome.toLowerCase()}.png'">
         <div class="info-boss-title-wrap">
           <span class="info-boss-nome">${b.nome}</span>
           <span class="info-boss-lv">Lv. ${b.nivel}</span>
