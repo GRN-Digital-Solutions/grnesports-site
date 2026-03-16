@@ -933,11 +933,19 @@ onAuthStateChanged(auth, async user => {
     const playersState = {};
     playersArr.forEach(uid => {
       const p = allPlayers[uid];
+      // Incluir golpes já na criação do estado — atualizarHPPlayer vai refinar depois
+      // mas se rodar antes do raidTeam carregar, pelo menos os golpes já estarão lá
+      const slot = (_userData?.raidTeam || []).find(s => s.pokemon === p.pokemon);
+      const golpesInit = slot?.golpes || [];
+      const ppInit = {};
+      golpesInit.forEach(k => { const m = MOVES_DB[k]; if (m) ppInit[k] = m.pp; });
       playersState[uid] = {
         uid, nick: p.nick, avatar: p.avatar,
         pokemon: p.pokemon, nivel: p.nivel||1,
-        hpMax: 100, hp: 100,  // recalculado por atualizarHPPlayer()
-        fainted: false, actedThisTurn: false, ppAtual: {},
+        hpMax: 100, hp: 100,
+        fainted: false, actedThisTurn: false,
+        golpes: golpesInit,
+        ppAtual: ppInit,
       };
     });
 
@@ -957,19 +965,26 @@ onAuthStateChanged(auth, async user => {
     // (pode ter sido inicializado por outro player)
     const bpSnap = await get(ref(rdb, `boss_salas/${salaId}/battle/players/${_uid}`));
     if (!bpSnap.exists() && playerNaSala) {
-      // Adicionar este player que chegou depois
       const p = playerNaSala;
+      const slot = (_userData?.raidTeam || []).find(s => s.pokemon === p.pokemon);
+      const golpesInit = slot?.golpes || [];
+      const ppInit = {};
+      golpesInit.forEach(k => { const m = MOVES_DB[k]; if (m) ppInit[k] = m.pp; });
       await set(ref(rdb, `boss_salas/${salaId}/battle/players/${_uid}`), {
         uid: _uid, nick: p.nick, avatar: p.avatar,
         pokemon: p.pokemon, nivel: p.nivel||1,
         hpMax: 100, hp: 100,
-        fainted: false, actedThisTurn: false, ppAtual: {},
+        fainted: false, actedThisTurn: false,
+        golpes: golpesInit,
+        ppAtual: ppInit,
       });
     }
   }
 
   // Atualizar HP real do player baseado no raidTeam do Firestore
   await atualizarHPPlayer();
+  // Retry com delay — garante que golpes cheguem mesmo se raidTeam carregou tarde
+  setTimeout(() => atualizarHPPlayer().catch(() => {}), 2500);
 
   // Atualizar estado da sala para 'batalha'
   await update(_bossRef, { estado: 'batalha' });
@@ -3300,7 +3315,7 @@ async function mostrarDrops(){
     // ── Diary: registrar entrada desta raid (últimas 5) ──────
     const diaryEntry = {
       ts:      Date.now(),
-      boss:    _bossNome || '?',
+      boss:    (_bossNome || '?').toLowerCase(),
       nivel:   _bossData?.nivel || 10,
       caught,
       shiny:   caught && !!bossSlot?.shiny,

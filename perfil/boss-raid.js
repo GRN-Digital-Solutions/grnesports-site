@@ -2591,10 +2591,11 @@ function abrirDiary() {
           ? `<span class="diary-caught-badge">${entry.shiny ? '✨ Shiny Caught!' : '✅ Caught!'}</span>`
           : '<span class="diary-fled-badge">❌ Not caught</span>';
 
-        const bossSprite = `/boss/img-bosses/${entry.boss}.png`;
+        const bossKey    = (entry.boss || '').toLowerCase();
+        const bossSprite = `/boss/img-bosses/${bossKey}.png`;
         return `<div class="diary-card" style="animation-delay:${idx * 0.06}s">
           <div class="diary-card-header">
-            <img src="${bossSprite}" class="diary-boss-img" onerror="this.src='/boss/img-pokeicon/${entry.boss}.png'">
+            <img src="${bossSprite}" class="diary-boss-img" onerror="this.src='/boss/img-pokeicon/${bossKey}.png'">
             <div class="diary-card-title">
               <span class="diary-boss-name">${capitalizar(entry.boss)}</span>
               <span class="diary-boss-lv">Lv. ${entry.nivel}</span>
@@ -2659,7 +2660,7 @@ function abrirModalInfo() {
     return `<div class="info-boss-card">
       <div class="info-boss-header">
         <img class="info-boss-sprite" src="${b.sprite}" alt="${b.nome}"
-             onerror="this.src='/perfil/img-pokeicon/${b.nome.toLowerCase()}.png'">
+             onerror="this.src='/boss/img-pokeicon/${b.nome.toLowerCase()}.png'">
         <div class="info-boss-title-wrap">
           <span class="info-boss-nome">${b.nome}</span>
           <span class="info-boss-lv">Lv. ${b.nivel}</span>
