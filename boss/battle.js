@@ -781,6 +781,14 @@ let _playerStages = {};  // { uid: { atk:0, def:0, spe:0, ... } }
 // Status conditions do boss: { sleep: turnosRestantes, confusion: bool }
 let _bossStatus   = { sleep:0, confusion:false };
 
+// Salvar _bossStatus no RTDB para sincronizar entre todos os players
+async function saveBossStatus() {
+  if (!_battleRef) return;
+  try {
+    await update(_battleRef, { bossStatus: JSON.parse(JSON.stringify(_bossStatus)) });
+  } catch(e) { console.warn('[bossStatus] save:', e); }
+}
+
 // helpers
 const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
 
@@ -933,19 +941,32 @@ onAuthStateChanged(auth, async user => {
     const playersState = {};
     playersArr.forEach(uid => {
       const p = allPlayers[uid];
-      // Incluir golpes já na criação do estado — atualizarHPPlayer vai refinar depois
-      // mas se rodar antes do raidTeam carregar, pelo menos os golpes já estarão lá
       const slot = (_userData?.raidTeam || []).find(s => s.pokemon === p.pokemon);
       const golpesInit = slot?.golpes || [];
       const ppInit = {};
       golpesInit.forEach(k => { const m = MOVES_DB[k]; if (m) ppInit[k] = m.pp; });
+      // Calcular HP real via calcStats para evitar o bug 100/20
+      const statsInit = slot
+        ? calcStats(p.pokemon, slot.ivs, slot.nivel||1, slot.nature||'Hardy', slot.evs)
+        : null;
+      const hpMaxInit  = statsInit?.hp || 100;
+      const hpInit = (typeof slot?.hpAtual === 'number' && slot.hpAtual >= 0)
+        ? slot.hpAtual : hpMaxInit;
       playersState[uid] = {
         uid, nick: p.nick, avatar: p.avatar,
         pokemon: p.pokemon, nivel: p.nivel||1,
-        hpMax: 100, hp: 100,
-        fainted: false, actedThisTurn: false,
+        hpMax: hpMaxInit, hp: hpInit,
+        fainted: slot?.fainted === true,
+        actedThisTurn: false,
         golpes: golpesInit,
         ppAtual: ppInit,
+        ability: slot?.ability || '',
+        heldItem: slot?.heldItem || null,
+        status: slot?.status || null,
+        ivs: slot?.ivs || {}, evs: slot?.evs || {},
+        nature: slot?.nature || 'Hardy',
+        slot: slot?.slot || null,
+        shiny: slot?.shiny === true,
       };
     });
 
@@ -970,13 +991,23 @@ onAuthStateChanged(auth, async user => {
       const golpesInit = slot?.golpes || [];
       const ppInit = {};
       golpesInit.forEach(k => { const m = MOVES_DB[k]; if (m) ppInit[k] = m.pp; });
+      const statsInit  = slot ? calcStats(p.pokemon, slot.ivs, slot.nivel||1, slot.nature||'Hardy', slot.evs) : null;
+      const hpMaxInit  = statsInit?.hp || 100;
+      const hpInit = (typeof slot?.hpAtual === 'number' && slot.hpAtual >= 0) ? slot.hpAtual : hpMaxInit;
       await set(ref(rdb, `boss_salas/${salaId}/battle/players/${_uid}`), {
         uid: _uid, nick: p.nick, avatar: p.avatar,
         pokemon: p.pokemon, nivel: p.nivel||1,
-        hpMax: 100, hp: 100,
-        fainted: false, actedThisTurn: false,
-        golpes: golpesInit,
-        ppAtual: ppInit,
+        hpMax: hpMaxInit, hp: hpInit,
+        fainted: slot?.fainted === true,
+        actedThisTurn: false,
+        golpes: golpesInit, ppAtual: ppInit,
+        ability: slot?.ability || '',
+        heldItem: slot?.heldItem || null,
+        status: slot?.status || null,
+        ivs: slot?.ivs || {}, evs: slot?.evs || {},
+        nature: slot?.nature || 'Hardy',
+        slot: slot?.slot || null,
+        shiny: slot?.shiny === true,
       });
     }
   }
@@ -1003,6 +1034,8 @@ onAuthStateChanged(auth, async user => {
     const hash = JSON.stringify(battleSemLog);
     const logChanged = _log !== undefined;
     _battleSnap = val;
+    // ── Sincronizar _bossStatus do RTDB — universal entre todos os players ──
+    if (val.bossStatus) _bossStatus = { ..._bossStatus, ...val.bossStatus };
     // Sincronizar statStages do Firebase para _playerStages local (todos os players)
     const playersSnap = val.players || {};
     Object.entries(playersSnap).forEach(([uid, p]) => {
@@ -2002,6 +2035,11 @@ window.btUsarGolpe = async function(idx, moveKey){
       }
     }
 
+    // Salvar _bossStatus no RTDB para todos os players verem
+    if (['sleep','confusion','poison','toxic','burn'].includes(eff)) {
+      await saveBossStatus();
+    }
+
     // ── PP via _battleRef (path relativo) ────────────────────
     const ppStatusSnap  = me.ppAtual || {};
     const ppStatusAntes = ppStatusSnap[moveKey] !== undefined
@@ -2108,20 +2146,24 @@ window.btUsarGolpe = async function(idx, moveKey){
           _bossStatus.poisonTurno = 0;
           showBossFloat('☠ Poison!', 'miss');
           logTxt += ` ${cap(me.pokemon)}'s attack poisoned the boss!`;
+          await saveBossStatus();
         }
       } else if (eff2 === 'burn' && !_bossStatus.burned) {
         _bossStatus.burned = true;
         showBossFloat('🔥 Burned!', 'super');
         logTxt += ' The boss was burned!';
+        await saveBossStatus();
       } else if (eff2 === 'sleep' && !_bossStatus.sleep) {
         const turnos = Math.floor(Math.random()*3)+1;
         _bossStatus.sleep = turnos;
         showBossFloat('💤 Sleep!', 'miss');
         logTxt += ` The boss fell asleep!`;
+        await saveBossStatus();
       } else if (eff2 === 'paralysis' && !_bossStatus.paralyzed) {
         _bossStatus.paralyzed = true;
         showBossFloat('⚡ Paralyzed!', 'miss');
         logTxt += ' The boss was paralyzed!';
+        await saveBossStatus();
       } else if (eff2 === 'debuff' && move.stat && move.stages) {
         // Damaging move com secondary stat debuff no boss (ex: Mud-Slap -1 acc)
         const variou = applyBossStage(move.stat, move.stages);
@@ -2504,6 +2546,7 @@ async function bossAtaca(){
       ? 'Boss is fast asleep! 💤'
       : 'Boss woke up! 👁';
     showBossFloat('💤', 'miss');
+    await saveBossStatus();
     await logAction(msg);
     _bossAttacking = false;
     return;
@@ -2512,18 +2555,17 @@ async function bossAtaca(){
   // ── Confusion: 50% de chance de se bater ────────────────
   if (_bossStatus.confusion){
     if (Math.random() < 0.5){
-      // Boss se bate: dano fixo baseado no Atk
       const selfDmg = Math.max(1, Math.floor(_bossStats.atk * 0.25));
       const newBossHp = Math.max(0, bs.bossHp - selfDmg);
       await update(_battleRef, { bossHp: newBossHp });
       showBossFloat(`-${selfDmg}`, '');
       await logAction(`Boss is confused! It hurt itself! (${selfDmg} dmg)`);
-      if (Math.random() < 0.33){ _bossStatus.confusion = false; await logAction('Boss snapped out of confusion!'); }
+      if (Math.random() < 0.33){ _bossStatus.confusion = false; await saveBossStatus(); await logAction('Boss snapped out of confusion!'); }
       _bossAttacking = false;
       return;
     } else if (Math.random() < 0.1){
-      // 10% de sair da confusão sem se bater
       _bossStatus.confusion = false;
+      await saveBossStatus();
       await logAction('Boss snapped out of its confusion!');
     }
   }
@@ -2708,6 +2750,7 @@ async function bossAtaca(){
         _bossStatus.confusion = true;
         showBossFloat('💫 Confused!', 'miss');
         logParts.push('Boss became confused!');
+        await saveBossStatus();
         continue;
       }
 
@@ -2717,6 +2760,7 @@ async function bossAtaca(){
         _bossStatus.poisonTurno = 0;
         showBossFloat('☠ Poisoned!', 'miss');
         logParts.push('Boss was poisoned!');
+        await saveBossStatus();
         continue;
       }
 
@@ -2725,6 +2769,7 @@ async function bossAtaca(){
         _bossStatus.burned = true;
         showBossFloat('🔥 Burned!', 'super');
         logParts.push('Boss was burned!');
+        await saveBossStatus();
         continue;
       }
 

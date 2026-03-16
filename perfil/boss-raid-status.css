@@ -1232,6 +1232,11 @@
   border-color: rgba(255,180,0,0.35);
   background: rgba(255,180,0,0.08);
 }
+.held-modal-item.held-bloqueado {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.held-modal-item.held-bloqueado:hover { background: transparent; }
 .held-modal-icon { font-size: 1.3rem; width: 28px; text-align: center; flex-shrink: 0; }
 .held-modal-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .held-modal-name { font-size: 0.72rem; font-weight: 700; color: #eee; }

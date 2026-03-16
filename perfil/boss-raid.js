@@ -3849,15 +3849,28 @@ function abrirUsarItem(key) {
 function abrirHeldItemModal(slot) {
   document.getElementById('heldItemModal')?.remove();
 
-  // Buscar held items disponíveis do usuário
-  const heldBag = _userData?.raidHeldItems || {};
+  const heldBag  = _userData?.raidHeldItems || {};
+  const raidTeam = _userData?.raidTeam || [];
+
+  // Calcular quantos de cada item já estão equipados em OUTROS slots
+  const equippedElsewhere = {};
+  raidTeam.forEach(s => {
+    if (s.slot !== slot.slot && s.heldItem) {
+      equippedElsewhere[s.heldItem] = (equippedElsewhere[s.heldItem] || 0) + 1;
+    }
+  });
+
   const available = Object.entries(HELD_ITEMS_DB).filter(([key]) => (heldBag[key] || 0) > 0);
 
   const itemsHTML = available.length
     ? available.map(([key, item]) => {
-        const qty      = heldBag[key] || 0;
-        const equipado = slot.heldItem === key;
-        return `<div class="held-modal-item ${equipado ? 'held-equipado' : ''}" data-key="${key}">
+        const qty       = heldBag[key] || 0;
+        const equipado  = slot.heldItem === key;
+        // Qtd disponível = total - equipados em outros slots
+        const inUse     = equippedElsewhere[key] || 0;
+        const available = qty - inUse;
+        const blocked   = !equipado && available <= 0;
+        return `<div class="held-modal-item ${equipado ? 'held-equipado' : ''} ${blocked ? 'held-bloqueado' : ''}" data-key="${key}">
           <div class="held-modal-icon">
             <img src="${item.img}" alt="${item.name}"
                  style="width:36px;height:36px;object-fit:contain;image-rendering:pixelated;"
@@ -3865,10 +3878,15 @@ function abrirHeldItemModal(slot) {
             <span style="display:none;font-size:1.4rem">${item.icon}</span>
           </div>
           <div class="held-modal-info">
-            <span class="held-modal-name">${item.name} ${equipado ? '(Equipped)' : `×${qty}`}</span>
+            <span class="held-modal-name">${item.name} ${equipado ? '(Equipped here)' : blocked ? '(In use)' : `×${available}`}</span>
             <span class="held-modal-desc">${item.desc}</span>
           </div>
-          ${!equipado ? `<button class="held-modal-equip-btn" data-key="${key}">Equip</button>` : ''}
+          ${equipado
+            ? ''
+            : blocked
+              ? '<span style="font-size:0.65rem;color:#555;padding:4px 8px">Equipped</span>'
+              : `<button class="held-modal-equip-btn" data-key="${key}">Equip</button>`
+          }
         </div>`;
       }).join('')
     : '<div class="held-modal-empty">No held items available.<br><span style="font-size:0.7rem;color:#666">Items can be obtained from missions and raids.</span></div>';
