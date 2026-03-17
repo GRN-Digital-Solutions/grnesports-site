@@ -9,6 +9,7 @@ import { getDatabase, ref, get, set, update, onValue, push, onDisconnect, remove
   from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 import { getFirestore, doc, getDoc, updateDoc, arrayUnion }
   from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { MOVES_DB } from './moves-config.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC9LLCXrQTHBagQxaChBazSfS5E4gUPIoI",
@@ -29,196 +30,6 @@ const fsdb  = getFirestore(fbApp);
 // ══════════════════════════════════════════════════════════════
 // MOVES_DB — usado no painel de golpes (PP incluído)
 // ══════════════════════════════════════════════════════════════
-const MOVES_DB = {
-  tackle:       {name:'Tackle',        type:'normal',  cat:'physical', power:40,  acc:100, pp:35},
-  scratch:      {name:'Scratch',       type:'normal',  cat:'physical', power:40,  acc:100, pp:35},
-  pound:        {name:'Pound',         type:'normal',  cat:'physical', power:40,  acc:100, pp:35},
-  quick_attack: {name:'Quick Attack',  type:'normal',  cat:'physical', power:40,  acc:100, pp:30},
-  body_slam:    {name:'Body Slam',     type:'normal',  cat:'physical', power:85,  acc:100, pp:15},
-  hyper_voice:  {name:'Hyper Voice',   type:'normal',  cat:'special',  power:90,  acc:100, pp:10},
-  swift:        {name:'Swift',         type:'normal',  cat:'special',  power:60,  acc:null,pp:20},
-  water_gun:    {name:'Water Gun',     type:'water',   cat:'special',  power:40,  acc:100, pp:25},
-  mud_slap:     {name:'Mud-Slap',      type:'ground',  cat:'special',  power:20,  acc:100, pp:10, effect:'debuff', stat:'acc', stages:-1, effectChance:100},
-  bubble:       {name:'Bubble',        type:'water',   cat:'special',  power:40,  acc:100, pp:30},
-  surf:         {name:'Surf',          type:'water',   cat:'special',  power:90,  acc:100, pp:15},
-  hydro_pump:   {name:'Hydro Pump',    type:'water',   cat:'special',  power:110, acc:80,  pp:5 },
-  scald:        {name:'Scald',         type:'water',   cat:'special',  power:80,  acc:100, pp:15},
-  ember:        {name:'Ember',         type:'fire',    cat:'special',  power:40,  acc:100, pp:25},
-  flamethrower: {name:'Flamethrower',  type:'fire',    cat:'special',  power:90,  acc:100, pp:15},
-  fire_blast:   {name:'Fire Blast',    type:'fire',    cat:'special',  power:110, acc:85,  pp:5 },
-  overheat:     {name:'Overheat',      type:'fire',    cat:'special',  power:130, acc:90,  pp:5 },
-  vine_whip:    {name:'Vine Whip',     type:'grass',   cat:'physical', power:45,  acc:100, pp:25},
-  branch_poke:  {name:'Branch Poke',   type:'grass',   cat:'physical', power:40,  acc:100, pp:40},
-  scary_face:   {name:'Scary Face',    type:'normal',  cat:'status',   power:null,acc:100, pp:10,  effect:'deboss', stat:'spe', stages:-2},
-  fury_swipes:  {name:'Fury Swipes',   type:'normal',  cat:'physical', power:18,  acc:80,  pp:15},
-  sucker_punch: {name:'Sucker Punch',  type:'dark',    cat:'physical', power:70,  acc:100, pp:5},
-  shadow_sneak: {name:'Shadow Sneak',  type:'ghost',   cat:'physical', power:40,  acc:100, pp:30},
-  razor_leaf:   {name:'Razor Leaf',    type:'grass',   cat:'physical', power:55,  acc:95,  pp:25},
-  seed_bomb:    {name:'Seed Bomb',     type:'grass',   cat:'physical', power:80,  acc:100, pp:15},
-  leaf_blade:   {name:'Leaf Blade',    type:'grass',   cat:'physical', power:90,  acc:100, pp:15},
-  energy_ball:  {name:'Energy Ball',   type:'grass',   cat:'special',  power:90,  acc:100, pp:10},
-  leaf_storm:   {name:'Leaf Storm',    type:'grass',   cat:'special',  power:130, acc:90,  pp:5 },
-  thundershock: {name:'ThunderShock',  type:'electric',cat:'special',  power:40,  acc:100, pp:30},
-  thunderbolt:  {name:'Thunderbolt',   type:'electric',cat:'special',  power:90,  acc:100, pp:15},
-  thunder:      {name:'Thunder',       type:'electric',cat:'special',  power:110, acc:70,  pp:10},
-  psychic:      {name:'Psychic',       type:'psychic', cat:'special',  power:90,  acc:100, pp:10},
-  earthquake:   {name:'Earthquake',    type:'ground',  cat:'physical', power:100, acc:100, pp:10},
-  shadow_ball:  {name:'Shadow Ball',   type:'ghost',   cat:'special',  power:80,  acc:100, pp:15},
-  iron_head:    {name:'Iron Head',     type:'steel',   cat:'physical', power:80,  acc:100, pp:15},
-  play_rough:   {name:'Play Rough',    type:'fairy',   cat:'physical', power:90,  acc:90,  pp:10},
-  moonblast:    {name:'Moonblast',     type:'fairy',   cat:'special',  power:95,  acc:100, pp:15},
-  close_combat: {name:'Close Combat',  type:'fighting',cat:'physical', power:120, acc:100, pp:5 },
-  aura_sphere:  {name:'Aura Sphere',   type:'fighting',cat:'special',  power:80,  acc:null,pp:20},
-  crunch:       {name:'Crunch',        type:'dark',    cat:'physical', power:80,  acc:100, pp:15},
-  knock_off:    {name:'Knock Off',     type:'dark',    cat:'physical', power:65,  acc:100, pp:20},
-  dragon_pulse: {name:'Dragon Pulse',  type:'dragon',  cat:'special',  power:85,  acc:100, pp:10},
-  aerial_ace:   {name:'Aerial Ace',    type:'flying',  cat:'physical', power:60,  acc:null,pp:20},
-  brave_bird:   {name:'Brave Bird',    type:'flying',  cat:'physical', power:120, acc:100, pp:15},
-  x_scissor:    {name:'X-Scissor',     type:'bug',     cat:'physical', power:80,  acc:100, pp:15},
-  poison_sting:  {name:'Poison Sting', type:'poison',  cat:'physical', power:15,  acc:100, pp:35, effect:'poison', effectChance:30},
-  twineedle:     {name:'Twineedle',    type:'bug',     cat:'physical', power:25,  acc:100, pp:20, effect:'poison', effectChance:20},
-  blizzard:     {name:'Blizzard',      type:'ice',     cat:'special',  power:110, acc:70,  pp:5 },
-  giga_drain:   {name:'Giga Drain',    type:'grass',   cat:'special',  power:75,  acc:100, pp:10},
-  rapid_spin:    {name:'Rapid Spin',    type:'normal',  cat:'physical', power:50,  acc:100, pp:40},
-  water_pulse:   {name:'Water Pulse',   type:'water',   cat:'special',  power:60,  acc:100, pp:20},
-  ice_beam:      {name:'Ice Beam',      type:'ice',     cat:'special',  power:90,  acc:100, pp:10},
-  flare_blitz:   {name:'Flare Blitz',   type:'fire',    cat:'physical', power:120, acc:100, pp:15},
-  aqua_tail:     {name:'Aqua Tail',     type:'water',   cat:'physical', power:90,  acc:90,  pp:10},
-  stone_edge:    {name:'Stone Edge',    type:'rock',    cat:'physical', power:100, acc:80,  pp:5 },
-  poison_jab:    {name:'Poison Jab',    type:'poison',  cat:'physical', power:80,  acc:100, pp:20},
-  // ── Status moves para players ────────────────────────────
-  swords_dance:  {name:'Swords Dance',  type:'normal',  cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'atk', stages:2},
-  calm_mind:     {name:'Calm Mind',     type:'psychic', cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'spa', stages:1},
-  nasty_plot:    {name:'Nasty Plot',    type:'dark',    cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'spa', stages:2},
-  bulk_up:       {name:'Bulk Up',       type:'fighting',cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'atk', stages:1},
-  sleep_powder:  {name:'Sleep Powder',  type:'grass',   cat:'status',   power:null,acc:75,  pp:15,
-                  effect:'sleep'},
-  hypnosis:      {name:'Hypnosis',      type:'psychic', cat:'status',   power:null,acc:60,  pp:20,
-                  effect:'sleep'},
-  will_o_wisp:   {name:'Will-O-Wisp',   type:'fire',    cat:'status',   power:null,acc:85,  pp:15,
-                  effect:'burn'},
-  toxic:         {name:'Toxic',         type:'poison',  cat:'status',   power:null,acc:90,  pp:10,
-                  effect:'toxic'},
-  screech:       {name:'Screech',       type:'normal',  cat:'status',   power:null,acc:85,  pp:40,
-                  effect:'debuff', stat:'def', stages:-2},
-  growl:         {name:'Growl',         type:'normal',  cat:'status',   power:null,acc:100, pp:40,
-                  effect:'debuff', stat:'atk', stages:-1},
-  leer:          {name:'Leer',          type:'normal',  cat:'status',   power:null,acc:100, pp:30,
-                  effect:'debuff', stat:'def', stages:-1},
-  confuse_ray:   {name:'Confuse Ray',   type:'ghost',   cat:'status',   power:null,acc:100, pp:10,
-                  effect:'confusion'},
-  recover:       {name:'Recover',       type:'normal',  cat:'status',   power:null,acc:null,pp:10,
-                  effect:'heal'},
-  // ── Outros status moves comuns ───────────────────────────
-  tail_whip:     {name:'Tail Whip',     type:'normal',  cat:'status',   power:null,acc:100, pp:30,
-                  effect:'debuff', stat:'def', stages:-1},
-  sand_attack:   {name:'Sand Attack',   type:'ground',  cat:'status',   power:null,acc:100, pp:15,
-                  effect:'debuff', stat:'acc', stages:-1},
-  smokescreen:   {name:'Smokescreen',   type:'normal',  cat:'status',   power:null,acc:100, pp:20,
-                  effect:'debuff', stat:'acc', stages:-1},
-  charm:         {name:'Charm',         type:'fairy',   cat:'status',   power:null,acc:100, pp:20,
-                  effect:'debuff', stat:'atk', stages:-2},
-  fake_tears:    {name:'Fake Tears',    type:'dark',    cat:'status',   power:null,acc:100, pp:20,
-                  effect:'debuff', stat:'spd', stages:-2},
-  harden:        {name:'Harden',        type:'normal',  cat:'status',   power:null,acc:null,pp:30,
-                  effect:'buff', stat:'def', stages:1},
-  defense_curl:  {name:'Defense Curl',  type:'normal',  cat:'status',   power:null,acc:null,pp:40,
-                  effect:'buff', stat:'def', stages:1},
-  agility:       {name:'Agility',       type:'psychic', cat:'status',   power:null,acc:null,pp:30,
-                  effect:'buff', stat:'spe', stages:2},
-  amnesia:       {name:'Amnesia',       type:'psychic', cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'spd', stages:2},
-  iron_defense:  {name:'Iron Defense',  type:'steel',   cat:'status',   power:null,acc:null,pp:15,
-                  effect:'buff', stat:'def', stages:2},
-  cotton_guard:  {name:'Cotton Guard',  type:'grass',   cat:'status',   power:null,acc:null,pp:10,
-                  effect:'buff', stat:'def', stages:3},
-  acid_armor:    {name:'Acid Armor',    type:'poison',  cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'def', stages:2},
-  belly_drum:    {name:'Belly Drum',    type:'normal',  cat:'status',   power:null,acc:null,pp:10,
-                  effect:'buff', stat:'atk', stages:6},
-  quiver_dance:  {name:'Quiver Dance',  type:'bug',     cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'spa', stages:1},
-  coil:          {name:'Coil',          type:'poison',  cat:'status',   power:null,acc:null,pp:20,
-                  effect:'buff', stat:'atk', stages:1},
-  work_up:       {name:'Work Up',       type:'normal',  cat:'status',   power:null,acc:null,pp:30,
-                  effect:'buff', stat:'atk', stages:1},
-  // ── Bug moves (Caterpie/Butterfree line) ─────────────────
-  string_shot:   {name:'String Shot',   type:'bug',     cat:'status',   power:null,acc:95,  pp:40,
-                  effect:'debuff', stat:'spe', stages:-2},
-  bug_bite:      {name:'Bug Bite',      type:'bug',     cat:'physical', power:60,  acc:100, pp:20},
-  bug_buzz:      {name:'Bug Buzz',      type:'bug',     cat:'special',  power:90,  acc:100, pp:10},
-  silver_wind:   {name:'Silver Wind',   type:'bug',     cat:'special',  power:60,  acc:100, pp:5 },
-  fury_cutter:   {name:'Fury Cutter',   type:'bug',     cat:'physical', power:40,  acc:95,  pp:20},
-  pin_missile:   {name:'Pin Missile',   type:'bug',     cat:'physical', power:25,  acc:95,  pp:20},
-  // ── Flying special extras ────────────────────────────────
-  gust:          {name:'Gust',          type:'flying',  cat:'special',  power:40,  acc:100, pp:35},
-  tailwind:      {name:'Tailwind',      type:'flying',  cat:'status',   power:null,acc:null,pp:15,
-                  effect:'buff', stat:'spe', stages:2},
-  // ── Grass status extras ──────────────────────────────────
-  stun_spore:    {name:'Stun Spore',    type:'grass',   cat:'status',   power:null,acc:75,  pp:30,
-                  effect:'paralysis'},
-  // ── Normal extras ───────────────────────────────────────
-  supersonic:    {name:'Supersonic',    type:'normal',  cat:'status',   power:null,acc:55,  pp:20,
-                  effect:'confusion'},
-  safeguard:     {name:'Safeguard',     type:'normal',  cat:'status',   power:null,acc:null,pp:25},
-  whirlwind:     {name:'Whirlwind',     type:'normal',  cat:'status',   power:null,acc:null,pp:20},
-  // ── Water moves ausentes ──
-  withdraw:      {name:'Withdraw',      type:'water',   cat:'status',   power:null,acc:null,pp:40,  effect:'buff', stat:'def', stages:1},
-  bubble:        {name:'Bubble',        type:'water',   cat:'special',  power:40,  acc:100, pp:30},
-  aqua_tail:     {name:'Aqua Tail',     type:'water',   cat:'physical', power:90,  acc:90,  pp:10},
-  aqua_jet:      {name:'Aqua Jet',      type:'water',   cat:'physical', power:40,  acc:100, pp:20},
-  water_pulse:   {name:'Water Pulse',   type:'water',   cat:'special',  power:60,  acc:100, pp:20},
-  rain_dance:    {name:'Rain Dance',    type:'water',   cat:'status',   power:null,acc:null,pp:5},
-  hydro_pump:    {name:'Hydro Pump',    type:'water',   cat:'special',  power:110, acc:80,  pp:5},
-  skull_bash:    {name:'Skull Bash',    type:'normal',  cat:'physical', power:130, acc:100, pp:10},
-  rapid_spin:    {name:'Rapid Spin',    type:'normal',  cat:'physical', power:50,  acc:100, pp:40},
-  // ── Bug moves ausentes ──
-  bug_bite:      {name:'Bug Bite',      type:'bug',     cat:'physical', power:60,  acc:100, pp:20},
-  string_shot:   {name:'String Shot',   type:'bug',     cat:'status',   power:null,acc:95,  pp:40, effect:'debuff', stat:'spe', stages:-1},
-  // ── Grass moves ausentes ──
-  absorb:        {name:'Absorb',        type:'grass',   cat:'special',  power:20,  acc:100, pp:25},
-  razor_leaf:    {name:'Razor Leaf',    type:'grass',   cat:'physical', power:55,  acc:95,  pp:25},
-  mega_drain:    {name:'Mega Drain',    type:'grass',   cat:'special',  power:40,  acc:100, pp:15},
-  leech_seed:    {name:'Leech Seed',    type:'grass',   cat:'status',   power:null,acc:90,  pp:10},
-  synthesis:     {name:'Synthesis',     type:'grass',   cat:'status',   power:null,acc:null,pp:5},
-  giga_drain:    {name:'Giga Drain',    type:'grass',   cat:'special',  power:75,  acc:100, pp:10},
-  leaf_storm:    {name:'Leaf Storm',    type:'grass',   cat:'special',  power:130, acc:90,  pp:5},
-  wood_hammer:   {name:'Wood Hammer',   type:'grass',   cat:'physical', power:120, acc:100, pp:15},
-  // ── Fire moves ausentes ──
-  ember:         {name:'Ember',         type:'fire',    cat:'special',  power:40,  acc:100, pp:25},
-  flame_charge:  {name:'Flame Charge',  type:'fire',    cat:'physical', power:50,  acc:100, pp:20},
-  flamethrower:  {name:'Flamethrower',  type:'fire',    cat:'special',  power:90,  acc:100, pp:15},
-  fire_blast:    {name:'Fire Blast',    type:'fire',    cat:'special',  power:110, acc:85,  pp:5},
-  flare_blitz:   {name:'Flare Blitz',   type:'fire',    cat:'physical', power:120, acc:100, pp:15},
-  heat_crash:    {name:'Heat Crash',    type:'fire',    cat:'physical', power:null,acc:100, pp:10},
-  // ── Misc ausentes ──
-  odor_sleuth:   {name:'Odor Sleuth',   type:'normal',  cat:'status',   power:null,acc:null,pp:40},
-  smog:          {name:'Smog',          type:'poison',  cat:'special',  power:30,  acc:70,  pp:20},
-  rollout:       {name:'Rollout',       type:'rock',    cat:'physical', power:30,  acc:90,  pp:20},
-  take_down:     {name:'Take Down',     type:'normal',  cat:'physical', power:90,  acc:85,  pp:20},
-  assurance:     {name:'Assurance',     type:'dark',    cat:'physical', power:60,  acc:100, pp:10},
-  head_smash:    {name:'Head Smash',    type:'rock',    cat:'physical', power:150, acc:80,  pp:5},
-  psybeam:       {name:'Psybeam',       type:'psychic', cat:'special',  power:65,  acc:100, pp:20},
-  fire_spin:     {name:'Fire Spin',     type:'fire',    cat:'special',  power:35,  acc:85,  pp:15},
-  lucky_chant:   {name:'Lucky Chant',   type:'normal',  cat:'status',   power:null,acc:null,pp:30},
-  light_screen:  {name:'Light Screen',  type:'psychic', cat:'status',   power:null,acc:null,pp:30},
-  psyshock:      {name:'Psyshock',      type:'psychic', cat:'special',  power:80,  acc:100, pp:10},
-  water_sport:   {name:'Water Sport',   type:'water',   cat:'status',   power:null,acc:null,pp:15},
-  focus_energy:  {name:'Focus Energy',  type:'normal',  cat:'status',   power:null,acc:null,pp:30},
-  razor_shell:   {name:'Razor Shell',   type:'water',   cat:'physical', power:75,  acc:95,  pp:10},
-  fury_cutter:   {name:'Fury Cutter',   type:'bug',     cat:'physical', power:40,  acc:95,  pp:20},
-  revenge:       {name:'Revenge',       type:'fighting',cat:'physical', power:60,  acc:100, pp:10},
-  encore:        {name:'Encore',        type:'normal',  cat:'status',   power:null,acc:100, pp:5},
-  retaliate:     {name:'Retaliate',     type:'normal',  cat:'physical', power:70,  acc:100, pp:5},
-  slash:         {name:'Slash',         type:'normal',  cat:'physical', power:70,  acc:100, pp:20},
-  // ── Explosion moves — bloqueados pela ability Damp ──────────────────
-  explosion:     {name:'Explosion',     type:'normal',  cat:'physical', power:250, acc:100, pp:5,  effect:'explosion'},
-  self_destruct: {name:'Self-Destruct', type:'normal',  cat:'physical', power:200, acc:100, pp:5,  effect:'explosion'},
-};
 
 const TIPO_CORES = {
   normal:'#9a9a7a',fire:'#f08030',water:'#6890f0',grass:'#78c850',
@@ -780,6 +591,7 @@ let _bossStages   = { atk:0, def:0, spa:0, spd:0, spe:0 };
 let _playerStages = {};  // { uid: { atk:0, def:0, spe:0, ... } }
 // Status conditions do boss: { sleep: turnosRestantes, confusion: bool }
 let _bossStatus   = { sleep:0, confusion:false };
+let _bossQuickAttackBonus = false; // Quick Attack: boss ganha turno extra
 
 // Salvar _bossStatus no RTDB para sincronizar entre todos os players
 async function saveBossStatus() {
@@ -1724,6 +1536,7 @@ window.btOpenBag = function(){
     antidote:     { name:'Antidote',     img:'antidote',      isBall:false },
     awakening:    { name:'Awakening',    img:'awakening',     isBall:false },
     burn_heal:    { name:'Burn Heal',    img:'burn_heal',     isBall:false },
+    paralyze_heal:{ name:'Paralyze Heal',img:'paralyze_heal', isBall:false },
     max_revive:   { name:'Max Revive',   img:'max_revive',    revive:true, isBall:false },
   };
 
@@ -1929,6 +1742,20 @@ window.btUsarGolpe = async function(idx, moveKey){
   // Lock do Firebase: previne double-action em latência de rede
   if (_battleSnap?.players?.[_uid]?.actedThisTurn) return;
 
+  // ── Paralysis: 25% de chance de não conseguir atacar ────
+  const _mePara = _battleSnap?.players?.[_uid];
+  if (_mePara?.status === 'paralysis' && Math.random() < 0.25) {
+    _actionDone = true;
+    pararTurnTimer();
+    setSubPanel(null);
+    showPlayerFloat(_uid, '⚡ Paralyzed!', 'miss');
+    await logAction(`${getNick()}'s ${cap(_mePara.pokemon)} is paralyzed! It can't move!`);
+    await processarStatusDanoPlayer();
+    await processarHeldItemEndTurn();
+    await avancarTurno();
+    return;
+  }
+
   // ── Insomnia: cura sleep no início do turno ──────────────
   const _meInsomnia = _battleSnap?.players?.[_uid];
   if (_meInsomnia?.ability === 'insomnia' && _meInsomnia?.status === 'sleep') {
@@ -2033,6 +1860,35 @@ window.btUsarGolpe = async function(idx, moveKey){
       } else {
         logExtra = ` ${cap(me.pokemon)}'s ${statNames[stat]||stat} won't go higher!`;
       }
+    } else if (eff === 'double_buff'){
+      // ► Roar: buffar DEF + Sp.DEF simultaneamente
+      const stats  = Array.isArray(move.stat) ? move.stat : ['def','spd'];
+      const stages = move.stages || 1;
+      const statNames = {atk:'Attack',def:'Defense',spa:'Sp. Atk',spd:'Sp. Def',spe:'Speed'};
+      const msgs = [];
+      stats.forEach(s => {
+        const variou = applyPlayerStage(_uid, s, stages);
+        if (variou !== 0) {
+          showPlayerFloat(_uid, `${s.toUpperCase()}↑`, 'heal');
+          msgs.push(`${statNames[s]||s} rose!`);
+        } else {
+          msgs.push(`${statNames[s]||s} won't go higher!`);
+        }
+      });
+      logExtra = ` ${cap(me.pokemon)}'s ${msgs.join(' ')}`;
+    } else if (eff === 'leech_seed'){
+      // ► Leech Seed: plantar semente no boss — imune em tipos Grass
+      const bossTiposLS = _bossData?.tipos || [];
+      if (bossTiposLS.includes('grass')) {
+        showBossFloat('Immune!', 'miss');
+        logExtra = ' It doesn\'t affect the boss!';
+      } else if (_battleSnap?.bossLeechSeeded) {
+        logExtra = ' The boss is already seeded!';
+      } else {
+        await update(_battleRef, { bossLeechSeeded: true, bossLeechSeedUser: _uid });
+        showBossFloat('🌱 Seeded!', 'miss');
+        logExtra = ` The boss was seeded by ${cap(me.pokemon)}!`;
+      }
     }
 
     // Salvar _bossStatus no RTDB para todos os players verem
@@ -2062,6 +1918,8 @@ window.btUsarGolpe = async function(idx, moveKey){
   }
 
   const myStats  = calcStats(me.pokemon, me.ivs, me.nivel||1, me.nature||'Hardy', me.evs);
+  // ── Paralysis: speed reduzida em 75% ──────────────────────
+  if (me.status === 'paralysis') myStats.spe = Math.max(1, Math.floor(myStats.spe * 0.25));
   const myAbility = me.ability || '';
 
   // ── Burn: reduz ATK físico em 50% ────────────────────────
@@ -2240,6 +2098,21 @@ window.btUsarGolpe = async function(idx, moveKey){
   await update(_battleRef, updates);
   await logAction(logTxt);
 
+  // ── Quick Attack: guardar prioridade no RTDB para próxima rodada ──
+  const movePriority = getMoveLight(moveKey)?.priority || 0;
+  if (movePriority > 0) {
+    // Guardar priority=1 → recalcularTurnOrder vai pôr este player primeiro
+    await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`),
+      { nextTurnPriority: movePriority });
+  } else {
+    // Resetar prioridade se não usou Quick Attack
+    const curPrio = _battleSnap?.players?.[_uid]?.nextTurnPriority || 0;
+    if (curPrio > 0) {
+      await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`),
+        { nextTurnPriority: 0 });
+    }
+  }
+
   await processarStatusDanoPlayer();
   await processarHeldItemEndTurn();
   await avancarTurno();
@@ -2263,6 +2136,7 @@ window.btUsarItem = async function(itemKey){
     antidote:{name:'Antidote',cureStatus:'poison'},
     awakening:{name:'Awakening',cureStatus:'sleep'},
     burn_heal:{name:'Burn Heal',cureStatus:'burn'},
+    paralyze_heal:{name:'Paralyze Heal',cureStatus:'paralysis'},
   };
 
   const info = ITEM_INFO[itemKey];
@@ -2335,6 +2209,8 @@ window.btUsarItem = async function(itemKey){
         ? `${cap(me.pokemon)} is not asleep!`
         : info.cureStatus === 'burn'
         ? `${cap(me.pokemon)} is not burned!`
+        : info.cureStatus === 'paralysis'
+        ? `${cap(me.pokemon)} is not paralyzed!`
         : `${cap(me.pokemon)} has no status condition!`;
       setMsg(statusMsg);
       _actionDone = false;
@@ -2345,8 +2221,9 @@ window.btUsarItem = async function(itemKey){
       status: null,
       sleepTurns: 0,
     });
-    const cureMsg = info.cureStatus === 'sleep' ? 'woke up'
-      : info.cureStatus === 'burn' ? 'was healed of its burn'
+    const cureMsg = info.cureStatus === 'sleep'    ? 'woke up'
+      : info.cureStatus === 'burn'      ? 'was healed of its burn'
+      : info.cureStatus === 'paralysis' ? 'was cured of paralysis'
       : 'was cured of poison';
     showPlayerFloat(_uid, '✨', 'heal');
     await logAction(`${getNick()} used ${info.name}! ${cap(me.pokemon)} ${cureMsg}!`);
@@ -2539,7 +2416,29 @@ async function bossAtaca(){
   if (Object.keys(statusUpdates).length){ await update(_battleRef, statusUpdates); }
   if (statusLog.length){ await logAction(statusLog.join(' ')); }
 
-  // ── Sleep: pular turno ───────────────────────────────────
+  // ── Leech Seed: drena 1/8 HP máx do boss por turno ────────
+  if (_battleSnap?.bossLeechSeeded && bs.bossHp > 0){
+    const lsDmg  = Math.max(1, Math.floor(bs.bossHpMax / 8));
+    const newBossHpLS = Math.max(0, bs.bossHp - lsDmg);
+    // Curar todos os players com leech seed ativa (acumulativo)
+    const lsPlayers  = Object.values(bs.players || {}).filter(p => !p.fainted && p.hp > 0);
+    const healPerPlayer = lsDmg; // cada player afetado recebe o dano total como cura
+    const lsUpdates  = { bossHp: newBossHpLS };
+    lsPlayers.forEach(p => {
+      const healed = Math.min(healPerPlayer, (p.hpMax || p.hp) - p.hp);
+      if (healed > 0) lsUpdates[`players/${p.uid}/hp`] = p.hp + healed;
+    });
+    await update(_battleRef, lsUpdates);
+    showBossFloat(`-${lsDmg}`, 'miss');
+    await logAction(`Leech Seed drained ${lsDmg} HP from the boss!`);
+    if (newBossHpLS <= 0){
+      await update(_battleRef, { bossFainted:true, bossTurnActive:false, fase:'capture',
+        captureQueue:[...(bs.turnOrder||[])], captureQueueIdx:0, captureResults:{} });
+      await logAction('The boss fainted from Leech Seed! Prepare to throw!');
+      _bossAttacking = false;
+      return;
+    }
+  }
   if (_bossStatus.sleep > 0){
     _bossStatus.sleep--;
     const msg = _bossStatus.sleep > 0
@@ -2773,8 +2672,28 @@ async function bossAtaca(){
         continue;
       }
 
+      // ── Double Buff (boss com Roar) ───────────────────────
+      if (eff === 'double_buff'){
+        const stats  = Array.isArray(move.stat) ? move.stat : ['def','spd'];
+        const stages = move.stages || 1;
+        const sNames = {atk:'Attack',def:'Defense',spa:'Sp.Atk',spd:'Sp.Def',spe:'Speed'};
+        stats.forEach(s => {
+          const v = applyBossStage(s, stages);
+          if (v !== 0) showBossFloat(`${s.toUpperCase()}↑`, 'buff');
+          logParts.push(v !== 0 ? `Boss's ${sNames[s]||s} rose!` : `Boss's ${sNames[s]||s} won't go higher!`);
+        });
+        continue;
+      }
+
       logParts.push('...');
       continue;
+    }
+
+    // ── Quick Attack bônus: boss ataca duas vezes ─────────────
+    const movePrioAtual = getMoveLight(move?.key || '')?.priority || 0;
+    if (movePrioAtual > 0 && move?.target !== 'self') {
+      // Será tratado após o logAction normal — flag para segundo ataque
+      _bossQuickAttackBonus = true;
     }
 
     const playerStats = calcStats(p.pokemon, p.ivs, p.nivel||1, p.nature||'Hardy', p.evs);
@@ -2929,19 +2848,20 @@ function recalcularTurnOrder(players, allUids) {
   return [...allUids].sort((a, b) => {
     const pa = players[a], pb = players[b];
     if (!pa || !pb) return 0;
+    // Prioridade: Quick Attack (priority=1) vai antes (priority=0)
+    const prioA = pa.nextTurnPriority || 0;
+    const prioB = pb.nextTurnPriority || 0;
+    if (prioB !== prioA) return prioB - prioA; // maior priority primeiro
     // SPE base do pokemon
     const statsA = calcStats(pa.pokemon, pa.ivs||{}, pa.nivel||1, pa.nature||'Hardy', pa.evs||{});
     const statsB = calcStats(pb.pokemon, pb.ivs||{}, pb.nivel||1, pb.nature||'Hardy', pb.evs||{});
-    // Aplicar stages de velocidade (do Firebase statStages ou local _playerStages)
     const stagesA = pa.statStages || _playerStages[a] || {};
     const stagesB = pb.statStages || _playerStages[b] || {};
     const speA = getEffStat(statsA.spe, 'spe', stagesA);
     const speB = getEffStat(statsB.spe, 'spe', stagesB);
-    if (speB !== speA) return speB - speA; // mais rápido primeiro
-    // desempate: manter ordem anterior se igual
+    if (speB !== speA) return speB - speA;
     return (allUids.indexOf(a)) - (allUids.indexOf(b));
   }).filter(uid => {
-    // remover fainted da ordem ativa (fainted são pulados no loop de nextIdx também)
     const p = players[uid];
     return p && !p.fainted && p.hp > 0;
   });
@@ -2995,6 +2915,16 @@ async function avancarTurno(){
       await logAction('— Boss turn! —');
       await new Promise(res => setTimeout(res, 2500));
       await bossAtaca();
+      // ── Quick Attack bônus: boss ataca novamente ──────────
+      if (_bossQuickAttackBonus) {
+        _bossQuickAttackBonus = false;
+        const bsCheck = (await get(_battleRef)).val();
+        if (bsCheck && !bsCheck.bossFainted && bsCheck.fase === 'battle') {
+          await new Promise(res => setTimeout(res, 1200));
+          await logAction('⚡ Quick Attack bonus! Boss attacks again!');
+          await bossAtaca();
+        }
+      }
     }
     // Re-ler estado após ataque do boss (pode ter aplicado debuffs de speed)
     const bsAfter = (await get(_battleRef)).val();
