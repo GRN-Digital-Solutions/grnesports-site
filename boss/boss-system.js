@@ -304,13 +304,33 @@ function getPaginaAtual() {
 
 // ============================================================
 // FUNÇÃO CENTRAL DE LIMPEZA — chamada de qualquer lugar
+
+// ── Helper: garante que a tarja existe em qualquer página ────
+function obterOuCriarTarja() {
+  let el = document.getElementById('boss-aviso-tarja');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'boss-aviso-tarja';
+    el.className = 'boss-tarja';
+    el.style.display = 'none';
+    // Inserir logo após o <header> ou no topo do <body>
+    const header = document.querySelector('header');
+    if (header && header.nextSibling) {
+      header.parentNode.insertBefore(el, header.nextSibling);
+    } else {
+      document.body.prepend(el);
+    }
+  }
+  return el;
+}
+
 // Remove sprite e tarja imediatamente, sem condições
 // ============================================================
 function limparTudoBoss() {
   if (_timerIntervalo)  { clearInterval(_timerIntervalo);  _timerIntervalo  = null; }
   if (_watcherIntervalo){ clearInterval(_watcherIntervalo); _watcherIntervalo = null; }
   const sprite = document.getElementById('boss-sprite-flutuante');
-  const tarja  = document.getElementById('boss-aviso-tarja');
+  const tarja  = obterOuCriarTarja();
   if (sprite) sprite.remove();
   if (tarja) {
     tarja.style.display = 'none';
@@ -386,7 +406,7 @@ function atualizarEstadoBoss(data) {
   window.__bossExpiracao = data?.expiracao || 0;
 
   const paginaAtual = getPaginaAtual();
-  const tarja       = document.getElementById('boss-aviso-tarja');
+  const tarja       = obterOuCriarTarja();
 
   // ---- VERIFICAÇÃO IMEDIATA DE EXPIRAÇÃO ----
   // Se o Firebase ainda diz 'ativo' mas o tempo já passou no cliente,
@@ -456,8 +476,8 @@ function iniciarContagemRegressiva(timestampAlvo, container, tipo) {
     const tempo    = `${minutos}m ${segundos}s`;
 
     container.innerHTML = tipo === 'anunciando'
-      ? `⚠️ <strong>Um Boss está para nascer em ${tempo}!</strong> Fique atento às páginas do site!`
-      : `🔴 <strong>BOSS ATIVO!</strong> Um boss está rugindo pelo site por mais <strong>${tempo}</strong>! Encontre-o e lute!`;
+      ? `⚠️ <strong>A Boss is about to appear in ${tempo}!</strong> Keep an eye on the site!`
+      : `🔴 <strong>BOSS ACTIVE!</strong> A boss is roaming the site for another <strong>${tempo}</strong>! Find it and fight!`;
   }
 
   atualizar();

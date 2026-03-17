@@ -488,20 +488,21 @@ function calcStats(pokemon,ivs,lvl,nature,evs){
 }
 
 // ── Fórmula de dano Gen 3+ ────────────────────────────────────
-function calcDano(atkStats, defStats, move, atkTipos, defTipos, nivel){
+function calcDano(atkStats, defStats, move, atkTipos, defTipos, nivel, critStages){
   if (!move || !move.power) return 0;
   const A   = move.cat === 'physical' ? atkStats.atk : atkStats.spa;
   const D   = move.cat === 'physical' ? defStats.def : defStats.spd;
   const N   = nivel || 1;
   const baseDmg = Math.floor((Math.floor((2*N/5)+2) * move.power * A / D) / 50 + 2);
-  // STAB
   const stab = (atkTipos||[]).includes(move.type) ? 1.5 : 1.0;
-  // Efetividade
   let eff = 1;
   (defTipos||['normal']).forEach(dt => { eff *= ((TYPE_CHART[move.type]||{})[dt] !== undefined ? TYPE_CHART[move.type][dt] : 1); });
-  // Crítico (1/16 chance, x2)
-  const crit = Math.random() < 1/16 ? 2.0 : 1.0;
-  // Random 85-100%
+  // Critical: base 1/24, highCrit moves = 1/8; Focus Energy stages aumentam
+  // 0→1/24, 1→1/8, 2→1/2, 3+→sempre crítico
+  const cs = critStages || 0;
+  const baseRate = move.highCrit ? 1/8 : 1/24;
+  const critRate = cs >= 3 ? 1.0 : cs === 2 ? 0.5 : cs === 1 ? 1/8 : baseRate;
+  const crit = Math.random() < critRate ? 2.0 : 1.0;
   const rnd = (0.85 + Math.random() * 0.15);
   return { dmg: Math.max(1, Math.floor(baseDmg * stab * eff * crit * rnd)), eff, crit, stab };
 }
@@ -1889,6 +1890,25 @@ window.btUsarGolpe = async function(idx, moveKey){
         showBossFloat('🌱 Seeded!', 'miss');
         logExtra = ` The boss was seeded by ${cap(me.pokemon)}!`;
       }
+    } else if (eff === 'toxic_spikes'){
+      // ► Toxic Spikes: envenena TODOS os players vivos que não sejam poison-type
+      const bsTS   = _battleSnap;
+      const updates = {};
+      let hitCount = 0;
+      Object.entries(bsTS?.players || {}).forEach(([uid, p]) => {
+        if (p.fainted || p.hp <= 0 || p.status) return;
+        const pTipos = POKEMON_TIPOS[p.pokemon] || ['normal'];
+        if (pTipos.includes('poison')) return; // imune
+        updates[`players/${uid}/status`] = 'poison';
+        hitCount++;
+      });
+      if (hitCount > 0) {
+        await update(_battleRef, updates);
+        showBossFloat('☠ Toxic Spikes!', 'miss');
+        logExtra = ` Toxic Spikes poisoned ${hitCount} Pokémon!`;
+      } else {
+        logExtra = ' But it had no effect!';
+      }
     }
 
     // Salvar _bossStatus no RTDB para todos os players verem
@@ -1938,7 +1958,8 @@ window.btUsarGolpe = async function(idx, moveKey){
   );
   const myStatsEff   = { ...myStats,   atk: move.cat==='physical'?myAtkEff:myStats.atk, spa: move.cat==='special'?myAtkEff:myStats.spa };
   const bossStatsEff = { ..._bossStats, def: move.cat==='physical'?bossDefEff:_bossStats.def, spd: move.cat==='special'?bossDefEff:_bossStats.spd };
-  const res = calcDano(myStatsEff, bossStatsEff, move, pokeTipos, bossTipos, me.nivel||1);
+  const res = calcDano(myStatsEff, bossStatsEff, move, pokeTipos, bossTipos, me.nivel||1,
+    _playerStages[_uid]?.crit || 0);
 
   // ── Accuracy: stage acc + Compound Eyes (+30%) ────────────
   const accStageMult = stageMult(_playerStages[_uid]?.acc || 0);
@@ -2682,6 +2703,27 @@ async function bossAtaca(){
           if (v !== 0) showBossFloat(`${s.toUpperCase()}↑`, 'buff');
           logParts.push(v !== 0 ? `Boss's ${sNames[s]||s} rose!` : `Boss's ${sNames[s]||s} won't go higher!`);
         });
+        continue;
+      }
+
+      // ── Toxic Spikes (boss): envenena TODOS os players vivos ──
+      if (eff === 'toxic_spikes'){
+        let hitCount = 0;
+        for (const tgt of Object.keys(players)) {
+          const tp = players[tgt];
+          if (tp.fainted || tp.hp <= 0 || tp.status) continue;
+          const pTipos = POKEMON_TIPOS[tp.pokemon] || ['normal'];
+          if (pTipos.includes('poison')) continue; // imune
+          const pAbil = tp.ability || '';
+          if (pAbil === 'shield_dust') {
+            logParts.push(`${cap(tp.pokemon)}'s Shield Dust blocked the poison!`);
+            continue;
+          }
+          updates[`players/${tgt}/status`] = 'poison';
+          hitCount++;
+          logParts.push(`${cap(tp.pokemon)} was poisoned by Toxic Spikes!`);
+        }
+        if (hitCount === 0) logParts.push('But it had no effect!');
         continue;
       }
 

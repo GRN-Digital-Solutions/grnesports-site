@@ -57,7 +57,8 @@ export const MOVES_DB = {
   safeguard:    {name:'Safeguard',     type:'normal',  cat:'status',   power:null,acc:null, pp:25},
   supersonic:   {name:'Supersonic',    type:'normal',  cat:'status',   power:null,acc:55,  pp:20,
                   effect:'confusion'},
-  focus_energy: {name:'Focus Energy',  type:'normal',  cat:'status',   power:null,acc:null, pp:30},
+  focus_energy: {name:'Focus Energy',  type:'normal',  cat:'status',   power:null,acc:null, pp:30,
+                  effect:'buff', stat:'crit', stages:2},    // +2 estágios de critical ratio
   encore:       {name:'Encore',        type:'normal',  cat:'status',   power:null,acc:100, pp:5},
   odor_sleuth:  {name:'Odor Sleuth',   type:'normal',  cat:'status',   power:null,acc:null, pp:40},
   // ► ROAR — adaptado: duplo buff DEF + Sp.DEF +1 em um turno
@@ -193,11 +194,14 @@ export const MOVES_DB = {
   mirror_move:  {name:'Mirror Move',   type:'flying',  cat:'status',   power:null,acc:null, pp:20},
   // ── Bug ─────────────────────────────────────────────────────
   bug_bite:     {name:'Bug Bite',      type:'bug',     cat:'physical', power:60,  acc:100, pp:20},
-  bug_buzz:     {name:'Bug Buzz',      type:'bug',     cat:'special',  power:90,  acc:100, pp:10},
+  bug_buzz:     {name:'Bug Buzz',      type:'bug',     cat:'special',  power:90,  acc:100, pp:10,
+                  effect:'debuff', stat:'spd', stages:-1, effectChance:10},
   silver_wind:  {name:'Silver Wind',   type:'bug',     cat:'special',  power:60,  acc:100, pp:5},
   fury_cutter:  {name:'Fury Cutter',   type:'bug',     cat:'physical', power:40,  acc:95,  pp:20},
   pin_missile:  {name:'Pin Missile',   type:'bug',     cat:'physical', power:25,  acc:95,  pp:20},
   x_scissor:    {name:'X-Scissor',     type:'bug',     cat:'physical', power:80,  acc:100, pp:15},
+  lunge:        {name:'Lunge',         type:'bug',     cat:'physical', power:80,  acc:100, pp:15,
+                  effect:'debuff', stat:'atk', stages:-1, effectChance:100},
   string_shot:  {name:'String Shot',   type:'bug',     cat:'status',   power:null,acc:95,  pp:40,
                   effect:'debuff', stat:'spe', stages:-2},
   // ── Poison ──────────────────────────────────────────────────
@@ -205,15 +209,50 @@ export const MOVES_DB = {
                   effect:'poison', effectChance:30},
   twineedle:    {name:'Twineedle',     type:'bug',     cat:'physical', power:25,  acc:100, pp:20,
                   effect:'poison', effectChance:20},
-  poison_jab:   {name:'Poison Jab',    type:'poison',  cat:'physical', power:80,  acc:100, pp:20},
+  poison_jab:   {name:'Poison Jab',    type:'poison',  cat:'physical', power:80,  acc:100, pp:20,
+                  effect:'poison', effectChance:30},
   poison_powder:{name:'Poison Powder', type:'poison',  cat:'status',   power:null,acc:75,  pp:35,
                   effect:'poison'},
+  // ► TOXIC SPIKES — envenena imediatamente todos os alvos (exceto poison-type)
+  toxic_spikes: {name:'Toxic Spikes',  type:'poison',  cat:'status',   power:null,acc:null,pp:20,
+                  effect:'toxic_spikes'},
   smog:         {name:'Smog',          type:'poison',  cat:'special',  power:30,  acc:70,  pp:20},
   toxic:        {name:'Toxic',         type:'poison',  cat:'status',   power:null,acc:90,  pp:10,
                   effect:'toxic'},
   acid_armor:   {name:'Acid Armor',    type:'poison',  cat:'status',   power:null,acc:null, pp:20,
                   effect:'buff', stat:'def', stages:2},
   // ── Rock ────────────────────────────────────────────────────
+  stone_edge:   {name:'Stone Edge',    type:'rock',    cat:'physical', power:100, acc:80,  pp:5},
+  rock_blast:   {name:'Rock Blast',    type:'rock',    cat:'physical', power:25,  acc:90,  pp:10},
+  rollout:      {name:'Rollout',       type:'rock',    cat:'physical', power:30,  acc:90,  pp:20},
+  // ── Steel ───────────────────────────────────────────────────
+  iron_head:    {name:'Iron Head',     type:'steel',   cat:'physical', power:80,  acc:100, pp:15},
+  iron_defense: {name:'Iron Defense',  type:'steel',   cat:'status',   power:null,acc:null, pp:15,
+                  effect:'buff', stat:'def', stages:2},
+  // ── Ice ─────────────────────────────────────────────────────
+  blizzard:     {name:'Blizzard',      type:'ice',     cat:'special',  power:110, acc:70,  pp:5},
+  ice_beam:     {name:'Ice Beam',      type:'ice',     cat:'special',  power:90,  acc:100, pp:10},
+  ice_fang:     {name:'Ice Fang',      type:'ice',     cat:'physical', power:65,  acc:95,  pp:15},
+  // ── Fairy ───────────────────────────────────────────────────
+  play_rough:   {name:'Play Rough',    type:'fairy',   cat:'physical', power:90,  acc:90,  pp:10},
+  moonblast:    {name:'Moonblast',     type:'fairy',   cat:'special',  power:95,  acc:100, pp:15},
+  // ── Fighting ────────────────────────────────────────────────
+  close_combat: {name:'Close Combat',  type:'fighting',cat:'physical', power:120, acc:100, pp:5},
+  aura_sphere:  {name:'Aura Sphere',   type:'fighting',cat:'special',  power:80,  acc:null, pp:20},
+  double_kick:  {name:'Double Kick',   type:'fighting',cat:'physical', power:30,  acc:100, pp:30},
+  bulk_up:      {name:'Bulk Up',       type:'fighting',cat:'status',   power:null,acc:null, pp:20,
+                  effect:'buff', stat:'atk', stages:1},
+  high_jump_kick:{name:'High Jump Kick',type:'fighting',cat:'physical',power:130, acc:90,  pp:10},
+  mach_punch:   {name:'Mach Punch',    type:'fighting',cat:'physical', power:40,  acc:100, pp:30,
+                  priority:1},
+  revenge:      {name:'Revenge',       type:'fighting',cat:'physical', power:60,  acc:100, pp:10},
+  // ── Dark extra ──────────────────────────────────────────────
+  // ► BRUTAL SWING — dark, physical, 60 PWR, sem efeito
+  brutal_swing: {name:'Brutal Swing',  type:'dark',    cat:'physical', power:60,  acc:100, pp:20},
+  // ── Ground extra ────────────────────────────────────────────
+  // ► DRILL RUN — ground, physical, 80 PWR, 95 ACC; crit 1/8 (highCrit:true)
+  drill_run:    {name:'Drill Run',     type:'ground',  cat:'physical', power:80,  acc:95,  pp:10,
+                  highCrit:true},
   stone_edge:   {name:'Stone Edge',    type:'rock',    cat:'physical', power:100, acc:80,  pp:5},
   rock_blast:   {name:'Rock Blast',    type:'rock',    cat:'physical', power:25,  acc:90,  pp:10},
   rollout:      {name:'Rollout',       type:'rock',    cat:'physical', power:30,  acc:90,  pp:20},

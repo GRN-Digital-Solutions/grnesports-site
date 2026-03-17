@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="perfil.css">
   <link rel="stylesheet" href="boss-raid-status.css">
   <meta name="theme-color" content="#ffad00">
+  <script type="module" src="../boss/boss-system.js"></script>
 </head>
 
 <body>
@@ -194,7 +195,7 @@
   </footer>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { 
     getAuth, 
     onAuthStateChanged, 
@@ -228,7 +229,7 @@
     measurementId: "G-84NHN394WF"
   };
 
-  const app = initializeApp(firebaseConfig);
+  const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   const db = getFirestore();
   const auth = getAuth(app);
   window._rvDb = db; // expor para raid view carregar pokédex do visitante
@@ -1386,7 +1387,8 @@ async function carregarBuildsUsuario(uid) {
 
   // ── Render grid de slots ───────────────────────────────────────────────
   function renderizarRaidTeamView(userData) {
-    const team   = userData?.raidTeam   || [];\n    const status = userData?.raidStatus || null;
+    const team   = userData?.raidTeam   || [];
+    const status = userData?.raidStatus || null;
     if(!team.length || status !== 'active') return;
     document.getElementById('rv-section').style.display = '';
 

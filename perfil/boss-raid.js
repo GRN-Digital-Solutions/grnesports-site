@@ -956,10 +956,11 @@ const MOVES_DB = {
 // LEARNSETS por nível — [ [level, 'move_key'], ... ]
 // ============================================================
 const LEARNSETS = {
-  bulbasaur:  [[1,'growl'],[1,'tackle'],[3,'vine_whip'],[6,'growth'],[9,'leech_seed'],[12,'razor_leaf'],[15,'poison_powder'],[15,'sleep_powder'],[25,'take_down'],[30,'magical_leaf'],[35,'synthesis'],[40,'amnesia'],[42,'sludge_wave'],[45,'doubleedge'],[55,'solar_beam']],
-  treecko:    [[1,'leer'],[1,'pound'],[3,'leafage'],[6,'quick_attack'],[9,'mega_drain'],[12,'detect'],[15,'quick_guard'],[18,'assurance'],[21,'giga_drain'],[24,'slam'],[27,'double_team'],[30,'energy_ball'],[33,'screech'],[36,'endeavor'],[39,'leaf_storm']],
-  turtwig:    [[1,'tackle'],[5,'withdraw'],[9,'absorb'],[13,'razor_leaf'],[17,'curse'],[21,'bite'],[25,'mega_drain'],[29,'leech_seed'],[33,'synthesis'],[37,'crunch'],[41,'giga_drain'],[45,'leaf_storm']],
-  snivy:      [[1,'tackle'],[4,'leer'],[7,'vine_whip'],[10,'wrap'],[13,'growth'],[16,'magical_leaf'],[19,'leech_seed'],[22,'mega_drain'],[25,'slam'],[28,'leaf_blade'],[31,'coil'],[34,'giga_drain'],[37,'gastro_acid'],[40,'leaf_storm']],
+  bulbasaur:  [[1,'tackle'],[1,'growl'],[3,'vine_whip'],[6,'leech_seed'],[9,'poison_powder'],[12,'razor_leaf'],[15,'sweet_scent'],[18,'growth'],[21,'synthesis'],[24,'seed_bomb'],[28,'energy_ball'],[32,'sludge_bomb'],[38,'leaf_storm']],
+  chikorita:  [[1,'tackle'],[1,'growl'],[6,'razor_leaf'],[9,'poison_powder'],[15,'synthesis'],[22,'giga_drain'],[38,'leaf_storm'],[44,'body_slam']],
+  treecko:    [[1,'pound'],[1,'leer'],[6,'absorb'],[11,'quick_attack'],[16,'bullet_seed'],[26,'giga_drain'],[51,'leaf_blade'],[56,'leaf_storm']],
+  turtwig:    [[1,'tackle'],[1,'withdraw'],[5,'absorb'],[9,'razor_leaf'],[17,'bite'],[21,'mega_drain'],[25,'leech_seed'],[29,'synthesis'],[33,'crunch'],[37,'giga_drain'],[41,'leaf_storm'],[45,'wood_hammer']],
+  snivy:      [[1,'tackle'],[1,'leer'],[4,'vine_whip'],[7,'wrap'],[10,'growth'],[13,'leech_seed'],[16,'mega_drain'],[19,'leaf_tornado'],[22,'coil'],[25,'giga_drain'],[28,'wring_out'],[31,'leaf_blade'],[34,'leaf_storm']],
   chespin:    [[1,'tackle'],[1,'growl'],[5,'vine_whip'],[9,'rollout'],[13,'bite'],[17,'needle_arm'],[21,'pin_missile'],[25,'take_down'],[29,'seed_bomb'],[33,'bulk_up'],[37,'body_slam'],[41,'pain_split'],[45,'wood_hammer']],
   rowlet:     [[1,'tackle'],[1,'growl'],[5,'peck'],[8,'leafage'],[11,'astonish'],[14,'razor_leaf'],[17,'quick_attack'],[20,'wing_attack'],[23,'leaf_blade'],[28,'aerial_ace'],[34,'energy_ball'],[40,'brave_bird'],[46,'leaf_storm']],
   grookey:    [[1,'scratch'],[1,'growl'],[3,'branch_poke'],[6,'taunt'],[9,'razor_leaf'],[12,'screech'],[15,'knock_off'],[18,'slam'],[21,'seed_bomb'],[27,'wood_hammer'],[30,'acrobatics']],
@@ -987,7 +988,7 @@ const LEARNSETS = {
   wooloo:     [[1,'tackle'],[1,'growl'],[4,'defense_curl'],[8,'rollout'],[12,'round'],[16,'double_kick'],[20,'take_down'],[24,'charm'],[28,'bulk_up'],[32,'double_edge'],[36,'swagger'],[40,'headbutt']],
   weedle:     [[1,'poison_sting'],[1,'string_shot']],
   kakuna:     [[1,'harden'],[7,'poison_sting']],
-  beedrill:   [[1,'poison_sting'],[1,'string_shot'],[7,'harden'],[15,'focus_energy'],[20,'brutal_swing'],[25,'xscissor'],[27,'bug_buzz'],[29,'toxic_spikes'],[33,'lunge'],[35,'poison_jab'],[40,'drill_run']],
+  beedrill:   [[1,'fury_attack'],[10,'twineedle'],[15,'poison_jab'],[20,'agility'],[28,'pin_missile'],[35,'x_scissor']],
   metapod:    [[1,'harden']],
   butterfree: [[1,'confusion'],[1,'sleep_powder'],[10,'gust'],[12,'stun_spore'],[14,'psybeam'],[16,'silver_wind'],[18,'supersonic'],[21,'tailwind'],[24,'safeguard'],[27,'whirlwind'],[30,'psychic_move'],[33,'bug_buzz'],[36,'quiver_dance']],
 };
@@ -2576,8 +2577,10 @@ function abrirDiary() {
 
         const dropsHTML = (entry.drops || []).map(d => {
           const isHeld  = HELD_KEYS.includes(d.item);
-          const imgPath = isHeld ? `/boss/img-held/${d.item}.png` : `/boss/img-items/${d.item}.png`;
           const dbEntry = ITEMS_DB[d.item] || HELD_ITEMS_DB[d.item];
+          // Usar img do DB diretamente — evita reconstruir o caminho errado
+          const imgPath = dbEntry?.img
+            || (isHeld ? `/boss/img-held/${d.item}.png` : `/boss/img-items/${d.item}.png`);
           const label   = dbEntry?.name || d.item.replace(/_/g,' ');
           return `<div class="diary-drop-chip ${isHeld ? 'diary-drop-held' : ''}">
             <img src="${imgPath}" class="diary-drop-img" onerror="this.style.opacity='0.3'">
