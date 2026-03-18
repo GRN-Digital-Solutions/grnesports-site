@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../style.css">
   <link rel="stylesheet" href="perfil.css">
   <link rel="stylesheet" href="boss-raid-status.css">
+  <link rel="stylesheet" href="./missions.css">
   <meta name="theme-color" content="#ffad00">
   <script type="module" src="../boss/boss-system.js"></script>
 </head>
@@ -214,6 +215,7 @@
 
   // Importar sistema de avaliação
   import { createRatingHTML, initRatingEvents } from './build-rating.js';
+  import { initMissions } from './missions.js';
 
   // Expor para uso global
   window.createRatingHTML = createRatingHTML;
@@ -493,9 +495,19 @@ async function atualizarMenuUsuario(user) {
   }
 
   // Monitorar estado de autenticação
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     atualizarMenuUsuario(user);
+    // Inicializar missions para o usuário logado — habilita missionsTrack
+    if (user) {
+      try {
+        const { getFirestore, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+        const fsdb = getFirestore(app);
+        const snap = await getDoc(doc(fsdb, 'usuarios', user.uid));
+        const userData = snap.exists() ? snap.data() : {};
+        await initMissions(user.uid, fsdb, userData);
+      } catch(e) { console.warn('[perfil-view] initMissions:', e); }
+    }
   });
 
   // Pegar UID da URL
@@ -1016,15 +1028,17 @@ async function carregarBuildsUsuario(uid) {
       window.initRatingEvents(uid, db);
 
       // ── Missão diária: avaliar build ─────────────────────────
-      // O build-rating.js já dispara o CustomEvent 'ratingSubmitted' e salva
-      // no localStorage automaticamente após o voto ser confirmado no Firebase.
-      // Este listener é um fallback extra para garantia.
       if (!window._ratingMissionHookRegistered) {
         window._ratingMissionHookRegistered = true;
         document.addEventListener('ratingSubmitted', function(e) {
-          console.log('[PokeMission] ratingSubmitted recebido (perfil-view listener):', e.detail);
-          // build-rating.js já tratou — não fazer nada aqui para evitar duplicata
-          // (a missão já está no localStorage ou foi chamada diretamente)
+          console.log('[PokeMission] ratingSubmitted em perfil-view:', e.detail);
+          // Chamar missionsTrack diretamente se disponível (missions.js carregado)
+          if (typeof window.missionsTrack === 'function') {
+            window.missionsTrack('buildsAvaliados', 1);
+          } else {
+            // Fallback: salvar no localStorage para o perfil consumir depois
+            try { localStorage.setItem('bossraid_pending_mission', 'avaliar_build'); } catch(e) {}
+          }
         });
       }
     }

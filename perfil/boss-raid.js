@@ -1196,11 +1196,11 @@ const ITEMS_DB = {
   paralyze_heal: { name:'Paralyze Heal', img:'../boss/img-items/paralyze_heal.png', category:'status', usableIn:'both',   desc:'Cures a Paralyzed Pokémon. Can be used on allies in battle.',                  effect:{ type:'paralyze_heal' } },
   leaf_stone:    { name:'Leaf Stone',    img:'../boss/img-items/leaf_stone.png',    category:'evo',    usableIn:'none',   desc:'A peculiar stone that makes certain species of Pokémon evolve. Rare drop from Bulbasaur.' },
   // ── Held Items — também registrados aqui para drops e exibição na bag ───
-  insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves. Rare drop from Spinarak.' },
-  silk_scarf:    { name:'Silk Scarf',    img:'../boss/img-held/silk_scarf.png',    category:'held',   usableIn:'none',   desc:'A sumptuous scarf that increases the power of Normal-type moves. Rare drop from Wooloo.' },
-  white_herb:    { name:'White Herb',    img:'../boss/img-held/white_herb.png',    category:'held',   usableIn:'none',   desc:'A hold item that restores any lowered stat once in battle. Consumed on use. Rare drop from Caterpie.' },
-  silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves. Rare drop from Weedle.' },
-  wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves. Rare drop from Bulbasaur.' },
+  insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves' },
+  silk_scarf:    { name:'Silk Scarf',    img:'../boss/img-held/silk_scarf.png',    category:'held',   usableIn:'none',   desc:'A sumptuous scarf that increases the power of Normal-type moves' },
+  white_herb:    { name:'White Herb',    img:'../boss/img-held/white_herb.png',    category:'held',   usableIn:'none',   desc:'A hold item that restores any lowered stat once in battle. Consumed on use' },
+  silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves' },
+  wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves' },
 };
 const BAG_ITENS_ORDEM   = ['pokebola','great_ball','ultra_ball','potion','super_potion','hyper_potion','max_potion','revive','max_revive','full_restore','ether','antidote','awakening','burn_heal','paralyze_heal','leaf_stone'];
 
@@ -1346,7 +1346,31 @@ async function usarItemNoPokemon(itemKey, slotIdx) {
     if (!slot.status || (slot.status !== 'poison' && slot.status !== 'toxic')){
       mostrarToastSimples('❌ ' + capitalizar(slot.pokemon) + ' is not poisoned!'); return;
     }
-    ok = true; // não muda HP, só remove status
+    ok = true;
+  }
+
+  // Awakening: cura sleep fora da batalha
+  if (ef?.type === 'awakening'){
+    if (slot.status !== 'sleep'){
+      mostrarToastSimples('❌ ' + capitalizar(slot.pokemon) + ' is not asleep!'); return;
+    }
+    ok = true;
+  }
+
+  // Burn Heal: cura burn fora da batalha
+  if (ef?.type === 'burn_heal'){
+    if (slot.status !== 'burn'){
+      mostrarToastSimples('❌ ' + capitalizar(slot.pokemon) + ' is not burned!'); return;
+    }
+    ok = true;
+  }
+
+  // Paralyze Heal: cura paralysis fora da batalha
+  if (ef?.type === 'paralyze_heal'){
+    if (slot.status !== 'paralysis'){
+      mostrarToastSimples('❌ ' + capitalizar(slot.pokemon) + ' is not paralyzed!'); return;
+    }
+    ok = true;
   }
 
   // Ether: +20 PP em UM golpe escolhido — seleção de golpe fica em abrirUsarItem/abrirEtherMoveSelect
@@ -1388,16 +1412,17 @@ async function usarItemNoPokemon(itemKey, slotIdx) {
   bag[itemKey] = (bag[itemKey] || 0) - 1;
   if (bag[itemKey] <= 0) delete bag[itemKey];
 
-  // Para antidote: remover poison. Para fullrestore: remover todos os status
+  // Para antidote/awakening/burn_heal/paralyze_heal: remover status. Para fullrestore: remover todos os status
+  const statusCureTypes = ['antidote','awakening','burn_heal','paralyze_heal','fullrestore'];
   const novoTeam = team.map((s, i) => {
     if (i !== slotIdx) return s;
     const updated = Object.assign({}, s, { hpAtual: novoHP });
-    if (ef?.type === 'antidote' || ef?.type === 'fullrestore') delete updated.status;
+    if (statusCureTypes.includes(ef?.type)) delete updated.status;
     if (ef?.type === 'revive') {
-      delete updated.status;    // status some ao reviver
-      updated.fainted = false;  // limpa flag fainted explicitamente
+      delete updated.status;
+      updated.fainted = false;
     }
-    if (ef?.type === 'fullrestore') updated.fainted = false; // full restore também revive
+    if (ef?.type === 'fullrestore') updated.fainted = false;
     return updated;
   });
   try {
@@ -1940,7 +1965,7 @@ function iniciarPoisonTick() {
         mostrarToastSimples('☠ ' + envenenados.map(s => capitalizar(s.pokemon)).join(', ') + ' lost 1 HP from Poison!', 'erro');
       }
     } catch(e) { console.error('[poison tick]', e); }
-  }, 60 * 1000); // 1 minuto
+  }, 10 * 1000); // 10 segundos
 }
 
 function pararPoisonTick() {
@@ -2444,7 +2469,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Caterpie',
       sprite:   '/boss/img-bosses/caterpie.png',
-      nivel:    10,
+      nivel:    5,
       estrelas: 1,
       golpes:   ['Tackle', 'String Shot'],
       drops: [
@@ -2460,7 +2485,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Weedle',
       sprite:   '/boss/img-bosses/weedle.png',
-      nivel:    10,
+      nivel:    5,
       estrelas: 1,
       golpes:   ['Poison Sting', 'String Shot'],
       drops: [
@@ -2476,7 +2501,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Wooloo',
       sprite:   '/boss/img-bosses/wooloo.png',
-      nivel:    10,
+      nivel:    5,
       estrelas: 1,
       golpes:   ['Tackle', 'Growl', 'Defense Curl', 'Rollout'],
       drops: [
@@ -2492,7 +2517,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Spinarak',
       sprite:   '/boss/img-bosses/spinarak.png',
-      nivel:    15,
+      nivel:    10,
       estrelas: 2,
       golpes:   ['Poison Sting', 'String Shot', 'Scary Face', 'Absorb'],
       drops: [
@@ -2508,7 +2533,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Bulbasaur',
       sprite:   '/boss/img-bosses/bulbasaur.png',
-      nivel:    25,
+      nivel:    20,
       estrelas: 3,
       golpes:   ['Vine Whip', 'Razor Leaf', 'Sleep Powder', 'Take Down'],
       drops: [
