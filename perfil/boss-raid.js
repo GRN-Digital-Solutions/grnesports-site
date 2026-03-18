@@ -1196,11 +1196,11 @@ const ITEMS_DB = {
   paralyze_heal: { name:'Paralyze Heal', img:'../boss/img-items/paralyze_heal.png', category:'status', usableIn:'both',   desc:'Cures a Paralyzed Pokémon. Can be used on allies in battle.',                  effect:{ type:'paralyze_heal' } },
   leaf_stone:    { name:'Leaf Stone',    img:'../boss/img-items/leaf_stone.png',    category:'evo',    usableIn:'none',   desc:'A peculiar stone that makes certain species of Pokémon evolve. Rare drop from Bulbasaur.' },
   // ── Held Items — também registrados aqui para drops e exibição na bag ───
-  insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves' },
-  silk_scarf:    { name:'Silk Scarf',    img:'../boss/img-held/silk_scarf.png',    category:'held',   usableIn:'none',   desc:'A sumptuous scarf that increases the power of Normal-type moves' },
-  white_herb:    { name:'White Herb',    img:'../boss/img-held/white_herb.png',    category:'held',   usableIn:'none',   desc:'A hold item that restores any lowered stat once in battle. Consumed on use' },
-  silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves' },
-  wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves' },
+  insect_plate:  { name:'Insect Plate',  img:'../boss/img-held/insect_plate.png',  category:'held',   usableIn:'none',   desc:'A stone tablet imbued with Bug-type energy. Increases power of Bug-type moves. Rare drop from Spinarak.' },
+  silk_scarf:    { name:'Silk Scarf',    img:'../boss/img-held/silk_scarf.png',    category:'held',   usableIn:'none',   desc:'A sumptuous scarf that increases the power of Normal-type moves. Rare drop from Wooloo.' },
+  white_herb:    { name:'White Herb',    img:'../boss/img-held/white_herb.png',    category:'held',   usableIn:'none',   desc:'A hold item that restores any lowered stat once in battle. Consumed on use. Rare drop from Caterpie.' },
+  silver_powder: { name:'Silver Powder', img:'../boss/img-held/silver_powder.png', category:'held',   usableIn:'none',   desc:'A shiny silver powder that increases the power of Bug-type moves. Rare drop from Weedle.' },
+  wise_glasses:  { name:'Wise Glasses',  img:'../boss/img-held/wise_glasses.png',  category:'held',   usableIn:'none',   desc:'Thick glasses that boost the power of Special-category moves. Rare drop from Bulbasaur.' },
 };
 const BAG_ITENS_ORDEM   = ['pokebola','great_ball','ultra_ball','potion','super_potion','hyper_potion','max_potion','revive','max_revive','full_restore','ether','antidote','awakening','burn_heal','paralyze_heal','leaf_stone'];
 
@@ -1942,32 +1942,42 @@ function iniciarPoisonTick() {
     const team = _userData?.raidTeam;
     if (!team) return;
     let mudou = false;
+    const faintedNames = [];
+    const damagedNames = [];
+
     const novoTeam = team.map(slot => {
       if (slot.status !== 'poison' && slot.status !== 'toxic') return slot;
-      const stats  = calcularStats(slot.pokemon, slot.ivs||{}, slot.nivel||1, slot.nature||'Hardy', slot.evs||{});
-      const hpMax  = stats.hp;
+      if (slot.fainted) return slot; // já fainted, não processar
+      const stats   = calcularStats(slot.pokemon, slot.ivs||{}, slot.nivel||1, slot.nature||'Hardy', slot.evs||{});
+      const hpMax   = stats.hp;
       const hpAtual = typeof slot.hpAtual === 'number' && slot.hpAtual > 0 ? slot.hpAtual : hpMax;
-      if (hpAtual <= 1) return slot; // já ao limite, não mata de vez
-      const newHp = Math.max(1, hpAtual - 1); // perde 1 HP por tick
+      const newHp   = Math.max(0, hpAtual - 1); // perde 1 HP por tick, pode chegar a 0
       mudou = true;
-      // Se chegou a 1 HP (mas não fainted — revive cura, não mata fora de batalha)
+
+      if (newHp <= 0) {
+        // Fainted por poison — remover status, marcar fainted
+        faintedNames.push(capitalizar(slot.pokemon));
+        return { ...slot, hpAtual: 0, fainted: true, status: null };
+      }
+      damagedNames.push(capitalizar(slot.pokemon));
       return { ...slot, hpAtual: newHp };
     });
+
     if (!mudou) return;
     try {
       const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
       await updateDoc(doc(_db, 'usuarios', _userId), { raidTeam: JSON.parse(JSON.stringify(novoTeam)) });
       _userData.raidTeam = novoTeam;
       renderizarBossRaid();
-      // Mostrar aviso de poison tick
-      const envenenados = novoTeam.filter(s => s.status === 'poison' || s.status === 'toxic');
-      if (envenenados.length > 0) {
-        mostrarToastSimples('☠ ' + envenenados.map(s => capitalizar(s.pokemon)).join(', ') + ' lost 1 HP from Poison!', 'erro');
+      if (damagedNames.length > 0) {
+        mostrarToastSimples('☠ ' + damagedNames.join(', ') + ' lost 1 HP from Poison!', 'erro');
+      }
+      if (faintedNames.length > 0) {
+        mostrarToastSimples('💀 ' + faintedNames.join(', ') + ' fainted from Poison!', 'erro');
       }
     } catch(e) { console.error('[poison tick]', e); }
   }, 10 * 1000); // 10 segundos
 }
-
 function pararPoisonTick() {
   if (_poisonTickInterval) { clearInterval(_poisonTickInterval); _poisonTickInterval = null; }
 }
@@ -2469,7 +2479,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Caterpie',
       sprite:   '/boss/img-bosses/caterpie.png',
-      nivel:    5,
+      nivel:    10,
       estrelas: 1,
       golpes:   ['Tackle', 'String Shot'],
       drops: [
@@ -2485,7 +2495,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Weedle',
       sprite:   '/boss/img-bosses/weedle.png',
-      nivel:    5,
+      nivel:    10,
       estrelas: 1,
       golpes:   ['Poison Sting', 'String Shot'],
       drops: [
@@ -2501,7 +2511,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Wooloo',
       sprite:   '/boss/img-bosses/wooloo.png',
-      nivel:    5,
+      nivel:    10,
       estrelas: 1,
       golpes:   ['Tackle', 'Growl', 'Defense Curl', 'Rollout'],
       drops: [
@@ -2517,7 +2527,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Spinarak',
       sprite:   '/boss/img-bosses/spinarak.png',
-      nivel:    10,
+      nivel:    15,
       estrelas: 2,
       golpes:   ['Poison Sting', 'String Shot', 'Scary Face', 'Absorb'],
       drops: [
@@ -2533,7 +2543,7 @@ const BOSS_EVENT_INFO = {
     {
       nome:     'Bulbasaur',
       sprite:   '/boss/img-bosses/bulbasaur.png',
-      nivel:    20,
+      nivel:    25,
       estrelas: 3,
       golpes:   ['Vine Whip', 'Razor Leaf', 'Sleep Powder', 'Take Down'],
       drops: [
@@ -3837,10 +3847,14 @@ function abrirUsarItem(key) {
           const pp = s.ppAtual?.[gk] !== undefined ? s.ppAtual[gk] : mv.pp;
           return pp < mv.pp;
         });
-        const canUse  = (ef?.type === 'heal' && !fainted && hpAtual < st.hp)
-                     || (ef?.type === 'revive' && fainted)
-                     || (ef?.type === 'fullrestore' && (hpAtual < st.hp || fainted))
-                     || temPPGasto;
+        const canUse  = (ef?.type === 'heal'         && !fainted && hpAtual < st.hp)
+                     || (ef?.type === 'revive'        && fainted)
+                     || (ef?.type === 'fullrestore'   && (hpAtual < st.hp || fainted || s.status))
+                     || temPPGasto
+                     || (ef?.type === 'antidote'      && (s.status === 'poison' || s.status === 'toxic'))
+                     || (ef?.type === 'awakening'     && s.status === 'sleep')
+                     || (ef?.type === 'burn_heal'     && s.status === 'burn')
+                     || (ef?.type === 'paralyze_heal' && s.status === 'paralysis');
         return '<div class="iusar-slot' + (canUse ? '' : ' nao-pode') + '" data-idx="' + i + '">'
           + '<img src="../perfil/img-pokeicon/' + s.pokemon + '.png" class="iusar-img">'
           + '<div class="iusar-info">'

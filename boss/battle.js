@@ -593,6 +593,9 @@ let _playerStages = {};  // { uid: { atk:0, def:0, spe:0, ... } }
 // Status conditions do boss: { sleep: turnosRestantes, confusion: bool }
 let _bossStatus   = { sleep:0, confusion:false };
 let _bossQuickAttackBonus = false; // Quick Attack: boss ganha turno extra
+let _bossFlinched = false;          // Boss flinched — pula próximo ataque
+const _playerFlinched = {};         // { uid: true } — player flinched este turno
+const _statusDamageDoneThisRound = {}; // { uid: true } — evita double-tick de status
 
 // Salvar _bossStatus no RTDB para sincronizar entre todos os players
 async function saveBossStatus() {
@@ -980,6 +983,14 @@ async function processarStatusDanoPlayer() {
   if (!me || me.fainted || me.hp <= 0) return;
   const status = me.status;
   if (status !== 'poison' && status !== 'toxic' && status !== 'burn') return;
+  // Evitar double-tick: só aplica uma vez por rodada
+  const roundKey = `${_uid}_${_battleSnap?.turno || 0}`;
+  if (_statusDamageDoneThisRound[roundKey]) return;
+  _statusDamageDoneThisRound[roundKey] = true;
+  // Limpar entradas antigas (manter apenas a rodada atual)
+  Object.keys(_statusDamageDoneThisRound).forEach(k => {
+    if (k !== roundKey) delete _statusDamageDoneThisRound[k];
+  });
   if (me.ability === 'shed_skin' && Math.random() < 0.30) {
     await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { status: null, toxicTurns: 0 });
     showPlayerFloat(_uid, '✨ Shed Skin!', 'heal');
@@ -1434,21 +1445,72 @@ function atualizarBotoes(bs){
 // ── Histórico de batalha (últimos 3 turnos) ──────────────────
 const _battleHistory = [];
 function limparHistorico(){ _battleHistory.length = 0; }
+
+// ── Animação de golpe (GIF sobre o sprite alvo) ──────────────
+// GIFs ficam em /boss/img-moves/{move_key}.gif
+// duration: tempo em ms que o GIF fica visível (default 600ms)
+function mostrarAnimacaoGolpe(targetEl, moveKey, duration = 600) {
+  if (!targetEl || !moveKey) return Promise.resolve();
+  return new Promise(res => {
+    const img = document.createElement('img');
+    img.src = `/boss/img-moves/${moveKey}.gif`;
+    img.style.cssText = [
+      'position:absolute',
+      'top:50%', 'left:50%',
+      'transform:translate(-50%,-50%)',
+      'width:clamp(240px,45vw,420px)',
+      'height:auto',
+      'z-index:50',
+      'pointer-events:none',
+      'image-rendering:auto',
+      'animation:moveGifPop 0.15s ease-out',
+    ].join(';');
+    // Se a imagem não existir, resolve imediatamente sem mostrar nada
+    img.onerror = () => { img.remove(); res(); };
+    img.onload  = () => {
+      // Garantir que o container do alvo é relative
+      const prev = getComputedStyle(targetEl).position;
+      if (prev === 'static') targetEl.style.position = 'relative';
+      targetEl.appendChild(img);
+      setTimeout(() => {
+        img.style.opacity = '0';
+        img.style.transition = 'opacity 0.15s ease';
+        setTimeout(() => { img.remove(); res(); }, 150);
+      }, duration);
+    };
+  });
+}
+
+function _enriquecerLog(txt) {
+  // Aplicar classes CSS para destacar partes do log automaticamente
+  return txt
+    .replace(/\((\d+) dmg\)/g,      '<span class="log-dmg">($1 dmg)</span>')
+    .replace(/\+\d+ HP/g,            m => `<span class="log-heal">${m}</span>`)
+    .replace(/-\d+ HP/g,             m => `<span class="log-dmg">${m}</span>`)
+    .replace(/💥 Critical hit!/g,     '<span class="log-crit">💥 Critical hit!</span>')
+    .replace(/⚡⚡? Super effective!/g,m => `<span class="log-super">${m}</span>`)
+    .replace(/No effect!/g,           '<span class="log-miss">No effect!</span>')
+    .replace(/missed!/gi,             '<span class="log-miss">missed!</span>')
+    .replace(/flinched/gi,            '<span class="log-miss">flinched</span>')
+    .replace(/fainted/gi,             '<span class="log-fainted">fainted</span>')
+    .replace(/poisoned|poison/gi,     m => `<span class="log-status-poison">${m}</span>`)
+    .replace(/burned|burn/gi,         m => `<span class="log-status-burn">${m}</span>`)
+    .replace(/asleep|sleep/gi,        m => `<span class="log-status-sleep">${m}</span>`)
+    .replace(/paralyzed/gi,           m => `<span class="log-status-para">${m}</span>`)
+    .replace(/rose|↑/g,              m => `<span class="log-buff">${m}</span>`)
+    .replace(/fell|↓/g,              m => `<span class="log-debuff">${m}</span>`);
+}
+
 function setMsg(txt){
   if (!txt) return;
-  // Adicionar ao histórico e manter apenas últimos 3
   _battleHistory.push(txt);
   if (_battleHistory.length > 3) _battleHistory.shift();
-  // Renderizar histórico
   const el = document.getElementById('msgText');
   if (!el) return;
-  // Último = destacado, anteriores = mais apagados
   el.innerHTML = _battleHistory.map((t, i) => {
-    const age = _battleHistory.length - 1 - i; // 0=mais recente, 1, 2
-    const opacity = age === 0 ? 1 : age === 1 ? 0.55 : 0.28;
-    const size = age === 0 ? '0.82rem' : age === 1 ? '0.74rem' : '0.68rem';
+    const age    = _battleHistory.length - 1 - i;
     const prefix = age === 0 ? '▶ ' : '  ';
-    return `<div class="log-entry log-age-${age}" style="opacity:${opacity};font-size:${size}">${prefix}${t}</div>`;
+    return `<div class="log-entry log-age-${age}">${prefix}${_enriquecerLog(t)}</div>`;
   }).join('');
 }
 
@@ -1740,8 +1802,22 @@ function isBossPoisonImmune() {
 // ── Usar golpe ───────────────────────────────────────────────
 window.btUsarGolpe = async function(idx, moveKey){
   if (!_myTurn || _actionDone) return;
-  // Lock do Firebase: previne double-action em latência de rede
   if (_battleSnap?.players?.[_uid]?.actedThisTurn) return;
+
+  // ── Flinch: player foi afetado por flinch no turno anterior ─
+  if (_playerFlinched[_uid]) {
+    _playerFlinched[_uid] = false;
+    _actionDone = true;
+    pararTurnTimer();
+    setSubPanel(null);
+    const _meFlinch = _battleSnap?.players?.[_uid];
+    showPlayerFloat(_uid, 'Flinched!', 'miss');
+    await logAction(`${getNick()}'s ${cap(_meFlinch?.pokemon)} flinched and couldn't move!`);
+    await processarStatusDanoPlayer();
+    await processarHeldItemEndTurn();
+    await avancarTurno();
+    return;
+  }
 
   // ── Paralysis: 25% de chance de não conseguir atacar ────
   const _mePara = _battleSnap?.players?.[_uid];
@@ -1930,7 +2006,9 @@ window.btUsarGolpe = async function(idx, moveKey){
     });
     // ────────────────────────────────────────────────────────────
 
-    await logAction(`${getNick()}'s ${cap(me.pokemon)} used ${move.name}!${logExtra}`);
+    // Animar golpe sobre o boss (status move)
+  await mostrarAnimacaoGolpe(document.querySelector('.boss-sprite-wrap'), moveKey);
+  await logAction(`${getNick()}'s ${cap(me.pokemon)} used ${move.name}!${logExtra}`);
     await processarStatusDanoPlayer();
     await processarHeldItemEndTurn();
     await avancarTurno();
@@ -2116,8 +2194,49 @@ window.btUsarGolpe = async function(idx, moveKey){
     logTxt += ' The boss has been defeated! Prepare to throw a Poké Ball!';
   }
 
+  // Animar golpe sobre o boss (damaging move)
+  await mostrarAnimacaoGolpe(document.querySelector('.boss-sprite-wrap'), moveKey);
   await update(_battleRef, updates);
   await logAction(logTxt);
+
+  // ── Flinch: chance de o boss não atacar no próximo turno ──
+  if (move.flinchChance && res.eff > 0 && newBossHp > 0) {
+    if (Math.random() * 100 < move.flinchChance) {
+      _bossFlinched = true;
+      await logAction('The boss flinched!');
+    }
+  }
+
+  // ── Recoil: player perde fração do dano causado ───────────
+  if (move.recoil && dano > 0 && newBossHp >= 0) {
+    const recoilDmg = Math.max(1, Math.floor(dano * (move.recoilFraction || 0.25)));
+    const me2 = _battleSnap?.players?.[_uid];
+    if (me2 && me2.hp > 0) {
+      const newHpRecoil = Math.max(0, me2.hp - recoilDmg);
+      await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: newHpRecoil });
+      showPlayerFloat(_uid, `-${recoilDmg}`, 'super');
+      await logAction(`${getNick()}'s ${cap(me2.pokemon)} took ${recoilDmg} recoil damage!`);
+      if (newHpRecoil <= 0) {
+        await update(ref(rdb, `boss_salas/${_salaId}/battle/players/${_uid}`), { hp: 0, fainted: true });
+        await logAction(`${getNick()}'s ${cap(me2.pokemon)} fainted from recoil!`);
+      }
+    }
+  }
+
+  // ── Fire Spin / Trap: prender boss e causar dano por turno ──
+  if (move.effect === 'trap' && res.eff > 0 && newBossHp > 0) {
+    const curSnap = (await get(_battleRef)).val();
+    if (!curSnap?.bossTrapped) {
+      const trapTurns = move.trapTurns || 5;
+      await update(_battleRef, {
+        bossTrapped:         true,
+        bossTrappedTurns:    trapTurns,
+        bossTrappedBy:       _uid,
+        bossTrappedFraction: move.trapDmgFraction || 8,
+      });
+      await logAction(`${cap(me.pokemon)} used ${move.name}! The boss is trapped in a vortex!`);
+    }
+  }
 
   // ── Quick Attack: guardar prioridade no RTDB para próxima rodada ──
   const movePriority = getMoveLight(moveKey)?.priority || 0;
@@ -2372,10 +2491,19 @@ async function arremessarPokebola(itemKey, info){
 // ══════════════════════════════════════════════════════════════
 async function bossAtaca(){
   _bossAttacking = true;
-  // Gravar no Firebase para que TODOS os clients vejam "Boss Turn" no banner
   await update(_battleRef, { bossTurnActive: true });
   const bannerEl = document.getElementById('turnBanner');
   if (bannerEl){ bannerEl.textContent = '🔴 Boss Turn!'; bannerEl.classList.add('boss-turn'); }
+
+  // ── Flinch: boss não pode atacar ────────────────────────────
+  if (_bossFlinched) {
+    _bossFlinched = false;
+    showBossFloat('Flinched!', 'miss');
+    await logAction('The boss flinched and couldn\'t move!');
+    _bossAttacking = false;
+    await update(_battleRef, { bossTurnActive: false });
+    return;
+  }
 
   const bs      = (await get(_battleRef)).val();
   if (!bs || bs.bossFainted){ _bossAttacking = false; return; }
@@ -2774,6 +2902,11 @@ async function bossAtaca(){
     updates[`players/${targetUid}/hp`] = newHp;
     if (newHp <= 0) updates[`players/${targetUid}/fainted`] = true;
 
+    // Animar golpe do boss sobre o sprite do player alvo
+    // (move é objeto; buscar a key no MOVES_DB pelo nome)
+    const bossMoveKey = Object.keys(MOVES_DB).find(k => MOVES_DB[k].name === move.name) || '';
+    const targetImgEl = document.getElementById(`prow-${targetUid}`);
+    await mostrarAnimacaoGolpe(targetImgEl, bossMoveKey, 500);
     showPlayerFloat(targetUid, `-${dano}`);
     logParts.push(`${players[targetUid].nick || 'Player'}'s ${cap(p.pokemon)} took ${dano} damage!`);
     if (res.eff > 1) logParts.push('Super effective!');
@@ -2844,10 +2977,40 @@ async function bossAtaca(){
     // Shake sprite do player
     const img = document.getElementById(`pimg-${targetUid}`);
     if (img){ img.classList.add('shake'); setTimeout(()=>img.classList.remove('shake'),350); }
+
+    // ── Flinch chance: boss move causa flinch no player ───────
+    if (move.flinchChance && res.eff > 0 && newHp > 0 && !p.fainted) {
+      if (Math.random() * 100 < move.flinchChance) {
+        _playerFlinched[targetUid] = true;
+      }
+    }
   }
 
   await update(_battleRef, updates);
   await logAction(logParts.join(' '));
+
+  // ── Fire Spin / Trap: dano adicional por turno ────────────
+  const bsAfterBoss = (await get(_battleRef)).val();
+  if (bsAfterBoss?.bossTrapped && bsAfterBoss.bossTrappedTurns > 0 && !bsAfterBoss.bossFainted) {
+    const trapFrac = bsAfterBoss.bossTrappedFraction || 8;
+    const trapDmg  = Math.max(1, Math.floor(bsAfterBoss.bossHpMax / trapFrac));
+    const newBossHpTrap = Math.max(0, bsAfterBoss.bossHp - trapDmg);
+    const turnsLeft = bsAfterBoss.bossTrappedTurns - 1;
+    const trapUpdates = { bossHp: newBossHpTrap, bossTrappedTurns: turnsLeft };
+    if (turnsLeft <= 0) { trapUpdates.bossTrapped = false; }
+    await update(_battleRef, trapUpdates);
+    showBossFloat(`-${trapDmg}`, 'miss');
+    await logAction(`The boss is hurt by the vortex! (${trapDmg} dmg)${turnsLeft <= 0 ? ' The boss broke free!' : ''}`);
+    if (newBossHpTrap <= 0) {
+      const bsTrap = (await get(_battleRef)).val();
+      const tOrd = bsTrap?.turnOrder || [];
+      await update(_battleRef, { bossFainted:true, bossTurnActive:false, fase:'capture',
+        captureQueue:[...tOrd], captureQueueIdx:0, captureResults:{} });
+      await logAction('The boss fainted from the trap! Prepare to throw!');
+      _bossAttacking = false;
+      return;
+    }
+  }
 
   // Verificar derrota total
   const bsNew = (await get(_battleRef)).val();
