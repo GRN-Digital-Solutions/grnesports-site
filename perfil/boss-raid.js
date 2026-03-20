@@ -2023,7 +2023,7 @@ function _mostrarPopupTrainerLevelUp(novoNivel, rewardItens) {
         + 'border-radius:8px;padding:5px 10px;font-size:0.72rem;color:#ffcf7f;font-weight:700">'
         + '<img src="../boss/img-items/' + k + '.png" '
         + 'style="width:14px;height:14px;vertical-align:middle;margin-right:4px" '
-        + 'onerror="this.style.display='none'">'
+        + 'onerror="this.style.display=&quot;none&quot;">'
         + (ITEM_NAMES[k] || k) + ' ×' + v
         + '</div>';
     });
