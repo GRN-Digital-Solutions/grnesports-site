@@ -1989,12 +1989,99 @@ window.iniciarQuestRaid     = iniciarQuest;
 
 window.processarPlayerLevelUpGlobal = function(xpGanho) {
   if (!_userData || !xpGanho) return;
-  const result = processarPlayerLevelUp(_userData, xpGanho);
+  const nivelAntes = _userData.playerLevel || 1;
+  const result     = processarPlayerLevelUp(_userData, xpGanho);
   _userData.playerLevel = result.novoNivel;
   _userData.playerXP    = result.novoXP;
   window._bossRaidUserData = _userData;
   renderizarBossRaid();
+  // Exibir popup de level up se subiu de nível
+  if (result.leveledUp && result.novoNivel > nivelAntes) {
+    _mostrarPopupTrainerLevelUp(result.novoNivel, result.rewardItens);
+  }
 };
+
+// ── Popup de Level Up do Trainer ────────────────────────────────────────────
+function _mostrarPopupTrainerLevelUp(novoNivel, rewardItens) {
+  // Remover popup anterior se existir
+  document.getElementById('_trainerLevelUpPopup')?.remove();
+
+  // Montar lista de recompensas
+  const ITEM_NAMES = {
+    potion:'Potion', super_potion:'Super Potion', hyper_potion:'Hyper Potion',
+    max_potion:'Max Potion', revive:'Revive', max_revive:'Max Revive',
+    pokebola:'Poké Ball', great_ball:'Great Ball', ultra_ball:'Ultra Ball',
+    ether:'Ether', antidote:'Antidote', awakening:'Awakening',
+  };
+  let rewardHTML = '';
+  if (rewardItens && Object.keys(rewardItens).length) {
+    rewardHTML = '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;justify-content:center">';
+    Object.entries(rewardItens).forEach(function(entry) {
+      var k = entry[0], v = entry[1];
+      rewardHTML +=
+        '<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,173,0,0.3);'
+        + 'border-radius:8px;padding:5px 10px;font-size:0.72rem;color:#ffcf7f;font-weight:700">'
+        + '<img src="../boss/img-items/' + k + '.png" '
+        + 'style="width:14px;height:14px;vertical-align:middle;margin-right:4px" '
+        + 'onerror="this.style.display='none'">'
+        + (ITEM_NAMES[k] || k) + ' ×' + v
+        + '</div>';
+    });
+    rewardHTML += '</div>';
+  }
+
+  var popup = document.createElement('div');
+  popup.id  = '_trainerLevelUpPopup';
+  popup.style.cssText = [
+    'position:fixed', 'top:50%', 'left:50%',
+    'transform:translate(-50%,-50%) scale(0.85)',
+    'z-index:99999',
+    'background:linear-gradient(160deg,#0d0d1f,#07070f)',
+    'border:2px solid rgba(255,173,0,0.65)',
+    'border-radius:20px',
+    'padding:28px 28px 22px',
+    'max-width:340px', 'width:92%',
+    'text-align:center',
+    'box-shadow:0 0 60px rgba(255,173,0,0.25),0 20px 60px rgba(0,0,0,0.8)',
+    'transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s ease',
+    'opacity:0',
+  ].join(';');
+
+  popup.innerHTML =
+    '<div style="font-size:2.8rem;line-height:1;margin-bottom:8px">🏅</div>'
+    + '<div style="font-size:0.65rem;font-weight:700;color:#ffad00;text-transform:uppercase;'
+    + 'letter-spacing:2px;margin-bottom:6px">Trainer Level Up!</div>'
+    + '<div style="font-size:2.8rem;font-weight:900;color:#ffe066;'
+    + 'text-shadow:0 0 30px rgba(255,220,50,0.7);line-height:1;margin-bottom:4px">'
+    + 'Lv. ' + novoNivel + '</div>'
+    + '<div style="font-size:0.72rem;color:#aaa;margin-bottom:2px">Congratulations, Trainer!</div>'
+    + (rewardHTML ? '<div style="font-size:0.65rem;color:#888;margin-top:8px;margin-bottom:2px">'
+      + 'Rewards unlocked:</div>' + rewardHTML : '')
+    + '<button id="_lvlUpCloseBtn" style="margin-top:18px;padding:9px 30px;'
+    + 'background:linear-gradient(135deg,rgba(255,173,0,0.25),rgba(255,117,0,0.15));'
+    + 'border:2px solid rgba(255,173,0,0.55);border-radius:10px;'
+    + 'color:#ffad00;cursor:pointer;font-size:0.78rem;font-weight:800;'
+    + 'letter-spacing:0.5px;transition:transform 0.1s">Continue ➤</button>';
+
+  document.body.appendChild(popup);
+
+  // Animar entrada
+  setTimeout(function() {
+    popup.style.opacity = '1';
+    popup.style.transform = 'translate(-50%,-50%) scale(1)';
+  }, 30);
+
+  // Fechar
+  function fechar() {
+    popup.style.opacity = '0';
+    popup.style.transform = 'translate(-50%,-50%) scale(0.9)';
+    setTimeout(function() { popup.remove(); }, 300);
+  }
+  document.getElementById('_lvlUpCloseBtn').addEventListener('click', fechar);
+
+  // Auto-fechar após 8s
+  setTimeout(fechar, 8000);
+}
 // Expor quest ativa para scripts cross-page (ex: sobre.html, contato.html)
 // Uso: window.completarMissaoCrossPage('missaoKey') — lê slotTarget do localStorage
 window.completarMissaoCrossPage = function(missaoKey) {
