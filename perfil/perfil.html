@@ -1810,14 +1810,15 @@ async function updateUI(user) {
   }
 
   function _renderMyFriends(friends) {
-    const section = document.getElementById('myFriendsSection');
-    const list    = document.getElementById('myFriendsList');
-    const count   = document.getElementById('myFriendsCount');
+    var section = document.getElementById('myFriendsSection');
+    var list    = document.getElementById('myFriendsList');
+    var count   = document.getElementById('myFriendsCount');
     if (!section || !list) return;
     if (!friends.length) { section.style.display = 'none'; return; }
     section.style.display = 'block';
     if (count) count.textContent = '(' + friends.length + '/15)';
     var DEFAULT_AV = '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png';
+    // Renderizar imediatamente com o avatar salvo (pode estar desatualizado)
     list.innerHTML = friends.map(function(f) {
       var safeName  = _sanitize(f.name || 'Trainer');
       var avatarSrc = _sanitize(f.avatar || DEFAULT_AV);
@@ -1827,6 +1828,7 @@ async function updateUI(user) {
         + ' class="_friend-link"'
         + '>'
         + '<img src="' + avatarSrc + '"'
+        + ' data-uid="' + f.id + '"'
         + ' data-fb="' + DEFAULT_AV + '"'
         + ' onerror="this.src=this.dataset.fb"'
         + ' style="width:26px;height:26px;border-radius:50%;object-fit:cover;'
@@ -1834,6 +1836,23 @@ async function updateUI(user) {
         + '<span style="font-size:0.75rem;color:#ddd;font-weight:600">' + safeName + '</span>'
         + '</a>';
     }).join('');
+    // Atualizar avatares em background — busca o avatar atual de cada amigo
+    friends.forEach(function(f) {
+      getDoc(doc(db, 'usuarios', f.id)).then(function(snap) {
+        if (!snap.exists()) return;
+        var freshAvatar = snap.data().avatar || DEFAULT_AV;
+        // Atualizar o <img> correspondente sem re-renderizar a lista
+        var img = list.querySelector('img[data-uid="' + f.id + '"]');
+        if (img && freshAvatar && img.src !== freshAvatar) {
+          img.src = freshAvatar;
+        }
+        // Atualizar também o campo salvo no Firestore se mudou
+        if (freshAvatar && freshAvatar !== (f.avatar || DEFAULT_AV)) {
+          setDoc(doc(db, 'usuarios', auth.currentUser && auth.currentUser.uid, 'friends', f.id),
+            { avatar: freshAvatar }, { merge: true }).catch(function(){});
+        }
+      }).catch(function(){});
+    });
   }
 
   function _sanitize(str) {

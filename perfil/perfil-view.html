@@ -1830,34 +1830,45 @@ async function carregarBuildsUsuario(uid) {
   };
 
   async function carregarListaAmigos(uid) {
-    const section = document.getElementById('friendsListSection');
-    const list    = document.getElementById('friendsList');
+    var section = document.getElementById('friendsListSection');
+    var list    = document.getElementById('friendsList');
     if (!section || !list) return;
     try {
       const snap     = await getDocs(collection(db, 'usuarios', uid, 'friends'));
       const accepted = snap.docs.filter(function(d){ return d.data().status === 'accepted'; });
       if (!accepted.length) { section.style.display = 'none'; return; }
       section.style.display = 'block';
+      var DEFAULT_AV = '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png';
+      // Renderizar imediatamente com avatar salvo, depois atualizar em background
       list.innerHTML = accepted.map(function(d) {
         var fuid  = d.id;
         var fname = d.data().name || 'Trainer';
-        var safeName = String(fname).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        var avatarSrc = String(d.data().avatar || '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png')
+        var safeName  = String(fname).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var avatarSrc = String(d.data().avatar || DEFAULT_AV)
                           .replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-        var fallback  = '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png';
         return '<a href="perfil-view.html?uid=' + fuid + '" style="'
           + 'display:inline-flex;align-items:center;gap:7px;'
           + 'text-decoration:none;transition:opacity 0.15s;padding:2px 0;"'
-          + ' class="_friend-link"'
-          + '>'
+          + ' class="_friend-link">'
           + '<img src="' + avatarSrc + '"'
-          + ' data-fb="' + fallback + '"'
+          + ' data-uid="' + fuid + '"'
+          + ' data-fb="' + DEFAULT_AV.replace(/"/g,'&quot;') + '"'
           + ' onerror="this.src=this.dataset.fb"'
           + ' style="width:26px;height:26px;border-radius:50%;object-fit:cover;'
           + 'border:1.5px solid rgba(255,117,0,0.4);flex-shrink:0;">'
           + '<span style="font-size:0.75rem;color:#ddd;font-weight:600">' + safeName + '</span>'
           + '</a>';
       }).join('');
+      // Atualizar avatares em background — pega o avatar atual de cada perfil
+      accepted.forEach(function(d) {
+        var fuid = d.id;
+        getDoc(doc(db, 'usuarios', fuid)).then(function(usnap) {
+          if (!usnap.exists()) return;
+          var freshAvatar = usnap.data().avatar || DEFAULT_AV;
+          var img = list.querySelector('img[data-uid="' + fuid + '"]');
+          if (img && freshAvatar) img.src = freshAvatar;
+        }).catch(function(){});
+      });
     } catch(e) {
       console.warn('[friends list]', e);
     }
