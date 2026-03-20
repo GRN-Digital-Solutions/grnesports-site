@@ -111,6 +111,10 @@
 .levelup-toast, .lu-icon, .lu-title, .lu-body, .lu-items { display:none; }
 </style>
 <script type="module" src="../boss/boss-system.js"></script>
+<style>
+  ._friend-link { opacity: 1; transition: opacity 0.15s; }
+  ._friend-link:hover { opacity: 0.72; }
+</style>
 </head>
 
 <body>
@@ -241,6 +245,24 @@
             <span class="share-feedback" id="shareFeedback" style="display: none;">✅ Copied!</span>
           </div>
 
+          <!-- ===== PEDIDOS DE AMIZADE RECEBIDOS ===== -->
+          <div id="friendRequestsSection" style="display:none;margin-top:12px;
+            background:rgba(46,204,113,0.05);border:1.5px solid rgba(46,204,113,0.3);
+            border-radius:12px;padding:12px 14px;">
+            <div style="font-size:0.7rem;font-weight:700;color:#2ecc71;text-transform:uppercase;
+                        letter-spacing:0.5px;margin-bottom:8px">📩 Friend Requests</div>
+            <div id="friendRequestsList"></div>
+          </div>
+
+          <!-- ===== LISTA DE AMIGOS (próprio perfil) ===== -->
+          <div id="myFriendsSection" style="display:none;margin-top:10px;">
+            <div style="font-size:0.7rem;font-weight:700;color:#aaa;text-transform:uppercase;
+                        letter-spacing:0.5px;margin-bottom:8px">👥 Friends
+              <span id="myFriendsCount" style="color:#555;font-weight:400"></span>
+            </div>
+            <div id="myFriendsList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+
           <!-- Modal de Ajuda -->
           <div class="modal-help-overlay" id="modalHelpPlayerId">
             <div class="modal-help-content">
@@ -256,6 +278,7 @@
             </div>
           </div>
         </div>
+
           <!-- Últimas Visualizações -->
           <div class="perfil-recent-views" id="recentViewsSection">
             <h4>Last Views</h4>
@@ -387,17 +410,18 @@
     updateProfile
   } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
   import { 
-  getFirestore, 
-  doc, 
-  getDoc,
-  collection, 
-  query, 
-  where, 
-  getDocs,
-  setDoc,      // ← Adicione estas 3
-  updateDoc,   // ← Adicione estas 3
-  deleteDoc    // ← Adicione estas 3 (você usa no excluirBuild)
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    getFirestore, 
+    doc, 
+    getDoc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    collection, 
+    query, 
+    where, 
+    getDocs,
+    onSnapshot
+  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
   // Importar funções do boss raid
   import { initBossRaid } from './boss-raid.js';
@@ -1727,7 +1751,242 @@ async function updateUI(user) {
       
       // (ribbons removidos)
     });
+
+    // Sistema de amizade — escutar pedidos em tempo real
+    if (user) {
+      _iniciarSistemaAmizadePerfil(user.uid);
+    }
   });
+
+  // ============================================================
+  // SISTEMA DE AMIZADE — perfil.html (próprio perfil)
+  // ============================================================
+  let _unsubFriendReqs = null;
+  let _unsubFriendsList = null;
+
+  function _iniciarSistemaAmizadePerfil(myUid) {
+    // Escutar pedidos recebidos em tempo real
+    if (_unsubFriendReqs) _unsubFriendReqs();
+    const reqRef = collection(db, 'usuarios', myUid, 'friendRequests');
+    _unsubFriendReqs = onSnapshot(reqRef, snap => {
+      const reqs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _renderFriendRequests(myUid, reqs);
+    });
+    // Escutar lista de amigos em tempo real
+    if (_unsubFriendsList) _unsubFriendsList();
+    const frRef = collection(db, 'usuarios', myUid, 'friends');
+    _unsubFriendsList = onSnapshot(frRef, snap => {
+      const accepted = snap.docs.filter(d => d.data().status === 'accepted')
+                                .map(d => ({ id: d.id, ...d.data() }));
+      _renderMyFriends(accepted);
+    });
+  }
+
+  function _renderFriendRequests(myUid, reqs) {
+    var section = document.getElementById('friendRequestsSection');
+    var list    = document.getElementById('friendRequestsList');
+    if (!section || !list) return;
+    if (!reqs.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = reqs.map(function(req) {
+      var safeName  = _sanitize(req.fromName || 'Trainer');
+      var onAcc = "window._aceitarAmigo('" + myUid + "','" + req.id + "','" + safeName + "')";
+      var onRec = "window._recusarAmigo('" + myUid + "','" + req.id + "')";
+      return '<div style="display:flex;align-items:center;justify-content:space-between;'
+        + 'gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<div style="font-size:0.78rem;color:#e0e0e0;font-weight:600">'
+        + '<span style="color:#ffad00">' + safeName + '</span>'
+        + '<span style="color:#666;font-size:0.65rem"> wants to add you as a friend</span>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0">'
+        + '<button onclick="' + onAcc + '" style="background:rgba(46,204,113,0.15);'
+        + 'border:1.5px solid rgba(46,204,113,0.5);border-radius:8px;color:#2ecc71;'
+        + 'cursor:pointer;padding:4px 12px;font-size:0.72rem;font-weight:800;">&#10003;</button>'
+        + '<button onclick="' + onRec + '" style="background:rgba(255,60,60,0.1);'
+        + 'border:1.5px solid rgba(255,60,60,0.4);border-radius:8px;color:#ff6060;'
+        + 'cursor:pointer;padding:4px 12px;font-size:0.72rem;font-weight:800;">&#10005;</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  function _renderMyFriends(friends) {
+    const section = document.getElementById('myFriendsSection');
+    const list    = document.getElementById('myFriendsList');
+    const count   = document.getElementById('myFriendsCount');
+    if (!section || !list) return;
+    if (!friends.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    if (count) count.textContent = '(' + friends.length + '/15)';
+    var DEFAULT_AV = '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png';
+    list.innerHTML = friends.map(function(f) {
+      var safeName  = _sanitize(f.name || 'Trainer');
+      var avatarSrc = _sanitize(f.avatar || DEFAULT_AV);
+      return '<a href="perfil-view.html?uid=' + f.id + '" style="'
+        + 'display:inline-flex;align-items:center;gap:7px;'
+        + 'text-decoration:none;transition:opacity 0.15s;padding:2px 0;"'
+        + ' class="_friend-link"'
+        + '>'
+        + '<img src="' + avatarSrc + '"'
+        + ' data-fb="' + DEFAULT_AV + '"'
+        + ' onerror="this.src=this.dataset.fb"'
+        + ' style="width:26px;height:26px;border-radius:50%;object-fit:cover;'
+        + 'border:1.5px solid rgba(255,117,0,0.4);flex-shrink:0;">'
+        + '<span style="font-size:0.75rem;color:#ddd;font-weight:600">' + safeName + '</span>'
+        + '</a>';
+    }).join('');
+  }
+
+  function _sanitize(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  window._aceitarAmigo = async function(myUid, fromUid, fromName) {
+    try {
+      // Verificar limite
+      const snap = await getDocs(collection(db, 'usuarios', myUid, 'friends'));
+      const accepted = snap.docs.filter(d => d.data().status === 'accepted');
+      if (accepted.length >= 15) {
+        alert('You already have 15 friends (maximum). Remove one to add another.');
+        return;
+      }
+      const mySnap    = await getDoc(doc(db, 'usuarios', myUid));
+      const myData    = mySnap.data() || {};
+      const myName    = myData.displayName || 'Trainer';
+      const myAvatar  = myData.avatar || '';
+      // Buscar avatar de quem pediu (fromUid) via friendRequest que já tem fromName
+      // mas não tem avatar — ler direto do perfil
+      const theirSnap   = await getDoc(doc(db, 'usuarios', fromUid));
+      const theirData   = theirSnap.data() || {};
+      const theirAvatar = theirData.avatar || '';
+      await Promise.all([
+        setDoc(doc(db, 'usuarios', myUid, 'friends', fromUid),
+          { status:'accepted', name: fromName, avatar: theirAvatar, since: Date.now() }),
+        setDoc(doc(db, 'usuarios', fromUid, 'friends', myUid),
+          { status:'accepted', name: myName, avatar: myAvatar, since: Date.now() }),
+        deleteDoc(doc(db, 'usuarios', myUid, 'friendRequests', fromUid)),
+        // Garantir que o lado de quem pediu também fica como accepted
+        deleteDoc(doc(db, 'usuarios', fromUid, 'friends', myUid))
+          .catch(()=>{}).then(() =>
+            setDoc(doc(db, 'usuarios', fromUid, 'friends', myUid),
+              { status:'accepted', name: myName, avatar: myAvatar, since: Date.now() })),
+      ]);
+    } catch(e) { console.error('[accept friend]', e); }
+  };
+
+  window._recusarAmigo = async function(myUid, fromUid) {
+    try {
+      await Promise.all([
+        deleteDoc(doc(db, 'usuarios', myUid, 'friendRequests', fromUid)),
+        deleteDoc(doc(db, 'usuarios', fromUid, 'friends', myUid)),
+      ]);
+    } catch(e) { console.error('[recusar friend]', e); }
+  };
+
+  // ============================================================
+  // POP-UP DE CONVITE DE SALA RECEBIDO
+  // ============================================================
+  // Escuta o nó RTDB: friendInvites/{myUid}
+  // Quando chega um convite, exibe balão acima do nome do perfil
+  function _iniciarEscutaConvites(myUid) {
+    import('https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js').then(
+      ({ getDatabase, ref, onValue, remove }) => {
+        const rdb      = getDatabase();
+        const invRef   = ref(rdb, 'friendInvites/' + myUid);
+        onValue(invRef, snap => {
+          if (!snap.exists()) return;
+          const data = snap.val();
+          // Ignorar convites com mais de 2 minutos (TTL) — podem ser stale
+          if (data.ts && (Date.now() - data.ts) > 120000) {
+            remove(invRef).catch(() => {});
+            return;
+          }
+          // data = { roomId, fromName, ts }
+          _mostrarBalaoCovite(data, myUid, invRef, remove);
+        });
+      }
+    );
+  }
+
+  function _mostrarBalaoCovite(data, myUid, invRef, removeFn) {
+    document.getElementById('_salaInvitePopup')?.remove();
+    var safeFrom  = _sanitize(data.fromName || 'A friend');
+    var safeRoom  = _sanitize(data.roomId || '');
+    var joinUrl   = '/boss/pre-battle.html?sala=' + safeRoom;
+
+    var popup = document.createElement('div');
+    popup.id  = '_salaInvitePopup';
+    popup.style.cssText = 'position:fixed;bottom:28px;right:24px;z-index:99999;'
+      + 'background:linear-gradient(160deg,#101020,#080810);'
+      + 'border:2px solid rgba(255,117,0,0.55);border-radius:16px;'
+      + 'padding:16px 18px;max-width:300px;'
+      + 'box-shadow:0 8px 40px rgba(255,117,0,0.2);'
+      + 'animation:pvInvitePop 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+
+    // Add keyframes via <style> tag
+    var styleEl = document.createElement('style');
+    styleEl.textContent = '@keyframes pvInvitePop{'
+      + 'from{opacity:0;transform:translateY(20px) scale(0.9)}'
+      + 'to{opacity:1;transform:translateY(0) scale(1)}}';
+    document.head.appendChild(styleEl);
+
+    popup.innerHTML =
+      '<div style="font-size:0.65rem;color:#ff9500;font-weight:700;text-transform:uppercase;'
+      + 'letter-spacing:0.5px;margin-bottom:6px">&#9876;&#65039; Raid Invite!</div>'
+      + '<div style="font-size:0.8rem;color:#e0e0e0;margin-bottom:10px;line-height:1.5">'
+      + '<b style="color:#ffad00">' + safeFrom + '</b> is inviting you to join their raid!'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.04);'
+      + 'border:1px solid rgba(255,117,0,0.3);border-radius:8px;padding:7px 12px;margin-bottom:12px;">'
+      + '<span style="font-size:0.7rem;color:#aaa">Room ID:</span>'
+      + '<span style="font-size:1rem;font-weight:900;color:#ffad00;letter-spacing:3px">' + safeRoom + '</span>'
+      + '<button id="_invCopyBtn" style="margin-left:auto;background:rgba(255,117,0,0.15);'
+      + 'border:1px solid rgba(255,117,0,0.4);border-radius:6px;color:#ffad00;cursor:pointer;'
+      + 'padding:3px 9px;font-size:0.64rem;font-weight:700">Copy</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button id="_invJoinBtn" style="flex:1;padding:8px;'
+      + 'background:linear-gradient(135deg,rgba(255,117,0,0.25),rgba(255,173,0,0.15));'
+      + 'border:2px solid rgba(255,117,0,0.55);border-radius:9px;color:#ffad00;'
+      + 'cursor:pointer;font-size:0.75rem;font-weight:800">&#9876;&#65039; Join Now</button>'
+      + '<button id="_invIgnoreBtn" style="padding:8px 12px;background:rgba(255,255,255,0.05);'
+      + 'border:1px solid rgba(255,255,255,0.1);border-radius:9px;color:#666;'
+      + 'cursor:pointer;font-size:0.75rem">Ignore</button>'
+      + '</div>';
+
+    document.body.appendChild(popup);
+
+    // Bind buttons after appending (no inline onclick with quotes)
+    document.getElementById('_invCopyBtn').addEventListener('click', function() {
+      navigator.clipboard.writeText(data.roomId || '');
+      this.textContent = 'Copied!';
+      setTimeout(function(btn){ btn.textContent = 'Copy'; }, 2000, this);
+    });
+    document.getElementById('_invJoinBtn').addEventListener('click', function() {
+      // Remover convite do RTDB antes de navegar — impede reaparecer ao voltar ao perfil
+      try { removeFn(invRef); } catch(e) {}
+      popup.remove();
+      window.location.href = joinUrl;
+    });
+    document.getElementById('_invIgnoreBtn').addEventListener('click', function() {
+      // Remover convite do RTDB ao ignorar — não volta a aparecer
+      try { removeFn(invRef); } catch(e) {}
+      popup.remove();
+    });
+
+    // Auto-remover após 30s e limpar RTDB
+    setTimeout(function(){
+      try { removeFn(invRef); } catch(e) {}
+      popup.remove();
+    }, 30000);
+  }
+
+  // Iniciar escuta de convites quando o usuário logar
+  onAuthStateChanged(auth, user => {
+    if (user) _iniciarEscutaConvites(user.uid);
+  });
+
 </script>
 
   <!-- Scripts principais -->

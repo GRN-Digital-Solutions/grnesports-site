@@ -290,6 +290,35 @@
     @media(max-width:520px){ .pb-players-grid{grid-template-columns:1fr 1fr} }
 
     /* ── Mobile: ≤ 640px ── */
+
+    /* ── Invite Friends Modal ── */
+    .pb-invite-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82);
+      z-index:10000; align-items:center; justify-content:center; }
+    .pb-invite-modal.open { display:flex; }
+    .pb-invite-panel {
+      background:linear-gradient(160deg,#0e0e1e,#080810);
+      border:2px solid rgba(46,204,113,0.4); border-radius:18px;
+      padding:24px 22px; max-width:360px; width:94%; max-height:80vh; overflow-y:auto;
+      box-shadow:0 0 60px rgba(46,204,113,0.12);
+    }
+    .pb-invite-title { font-size:0.95rem; font-weight:800; color:#2ecc71;
+      text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+    .pb-invite-friend-row {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);
+    }
+    .pb-invite-friend-name { font-size:0.78rem; font-weight:600; color:#e0e0e0; }
+    .pb-invite-btn {
+      padding:5px 14px; border-radius:8px; font-size:0.7rem; font-weight:800;
+      cursor:pointer; border:1.5px solid rgba(255,117,0,0.5);
+      background:rgba(255,117,0,0.1); color:#ffad00; transition:background 0.15s;
+      white-space:nowrap;
+    }
+    .pb-invite-btn:hover { background:rgba(255,117,0,0.25); }
+    .pb-invite-btn.sent { border-color:rgba(46,204,113,0.4); background:rgba(46,204,113,0.08);
+      color:#2ecc71; cursor:default; }
+    .pb-invite-empty { font-size:0.72rem; color:#555; text-align:center; padding:16px 0; }
+
     @media(max-width:640px) {
       /* Header: empilhar título e room ID verticalmente */
       .pb-header {
@@ -401,6 +430,9 @@
     <div class="pb-room-id" id="pbRoomIdRow" style="display:none">
       Room ID: <span class="pb-room-id-val" id="pbRoomIdVal">—</span>
       <button class="pb-copy-btn" id="pbCopyBtn">Copy</button>
+      <button class="pb-copy-btn" id="pbInviteFriendsBtn"
+        style="background:rgba(46,204,113,0.15);border-color:rgba(46,204,113,0.4);color:#2ecc71;"
+        onclick="window.abrirModalConvidar()">👥 Invite</button>
     </div>
     <div class="pb-status-label" id="pbStatusLbl">Waiting for players...</div>
     <button class="pb-leave-btn" id="pbLeaveBtn">✕ Leave Room</button>
@@ -483,7 +515,7 @@ import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getDatabase, ref, set, get, update, onValue, push, onDisconnect, remove, query, orderByChild }
   from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
-import { getFirestore, doc, getDoc, updateDoc }
+import { getFirestore, doc, getDoc, updateDoc, getDocs, collection }
   from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1579,6 +1611,106 @@ window.enviarChat              = enviarChat;
 function fecharBagModal() {
   document.getElementById('pbBagModal')?.classList.remove('open');
 }
+
+// ============================================================
+// SISTEMA DE CONVITE DE AMIGOS — pre-battle.html
+// ============================================================
+
+window.abrirModalConvidar = async function() {
+  if (!_salaId) return;
+  const modal = document.getElementById('pbInviteModal');
+  const list  = document.getElementById('pbInviteFriendsList');
+  modal.classList.add('open');
+  list.innerHTML = '<div class="pb-invite-empty">Loading friends...</div>';
+
+  if (!_uid) return;
+  try {
+    const fsdb = getFirestore(fbApp);
+    const snap = await getDocs(collection(fsdb, 'usuarios', _uid, 'friends'));
+    const friends = snap.docs
+      .filter(d => d.data().status === 'accepted')
+      .map(d => ({ id: d.id, name: d.data().name || 'Trainer' }));
+
+    if (!friends.length) {
+      list.innerHTML = '<div class="pb-invite-empty">You have no friends yet.<br>Add friends from their profiles!</div>';
+      return;
+    }
+
+    // Verificar se sala já está cheia
+    const salaSnap = await get(ref(rdb, `boss_salas/${_salaId}/players`));
+    const playersNow = salaSnap.val() ? Object.keys(salaSnap.val()).length : 0;
+    const salaCheia = playersNow >= MAX_PLAYERS;
+
+    list.innerHTML = friends.map(f => `
+      <div class="pb-invite-friend-row">
+        <span class="pb-invite-friend-name">👤 ${_pbSanitize(f.name)}</span>
+        ${salaCheia
+          ? '<span style="font-size:0.66rem;color:#ff4444;font-weight:700">Room Full</span>'
+          : `<button class="pb-invite-btn" id="invBtn_${f.id}"
+               onclick="window.enviarConviteAmigo('${f.id}','${_pbSanitize(f.name)}')">
+               ⚔️ Invite
+             </button>`
+        }
+      </div>`).join('');
+  } catch(e) {
+    console.error('[invite modal]', e);
+    list.innerHTML = '<div class="pb-invite-empty">Error loading friends.</div>';
+  }
+};
+
+window.enviarConviteAmigo = async function(friendUid, friendName) {
+  if (!_salaId || !_uid) return;
+  const btn = document.getElementById('invBtn_' + friendUid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+
+  try {
+    // Verificar sala cheia antes de enviar
+    const salaSnap = await get(ref(rdb, `boss_salas/${_salaId}/players`));
+    const playersNow = salaSnap.val() ? Object.keys(salaSnap.val()).length : 0;
+    if (playersNow >= MAX_PLAYERS) {
+      if (btn) { btn.textContent = 'Room Full'; btn.className = 'pb-invite-btn sent'; }
+      return;
+    }
+
+    // Gravar convite no RTDB: friendInvites/{friendUid}
+    // O perfil.html do amigo escuta esse nó e exibe o balão
+    const myName = _userData?.displayName || 'A friend';
+    await set(ref(rdb, `friendInvites/${friendUid}`), {
+      roomId:   _salaId,
+      fromUid:  _uid,
+      fromName: myName,
+      ts:       Date.now(),
+    });
+
+    // Auto-remover convite após 2 minutos (TTL)
+    setTimeout(async () => {
+      try {
+        const cur = await get(ref(rdb, `friendInvites/${friendUid}`));
+        if (cur.val()?.fromUid === _uid) {
+          await remove(ref(rdb, `friendInvites/${friendUid}`));
+        }
+      } catch(e) {}
+    }, 120000);
+
+    if (btn) { btn.textContent = '✅ Sent!'; btn.className = 'pb-invite-btn sent'; }
+  } catch(e) {
+    console.error('[send invite]', e);
+    if (btn) { btn.disabled = false; btn.textContent = '⚔️ Invite'; }
+  }
+};
+
+function _pbSanitize(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('pbInviteModal')?.addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+
 window.fecharBagModal = fecharBagModal;
 
 // Fechar ao clicar fora do painel
@@ -1598,6 +1730,24 @@ document.addEventListener('click', e => {
     <div class="pb-bag-modal-poke" id="pbBagModalPoke"></div>
     <div class="pb-bag-modal-items" id="pbBagModalItems">
       <div class="pb-bag-modal-empty">Empty bag</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Invite Friends Modal -->
+<div class="pb-invite-modal" id="pbInviteModal">
+  <div class="pb-invite-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div class="pb-invite-title">👥 Invite Friends</div>
+      <button onclick="document.getElementById('pbInviteModal').classList.remove('open')"
+        style="background:none;border:none;color:#555;font-size:1.1rem;cursor:pointer;padding:2px 6px">✕</button>
+    </div>
+    <p style="font-size:0.65rem;color:#555;margin-bottom:12px">
+      Send your room ID to a friend. They'll receive a pop-up with a Join button.
+    </p>
+    <div id="pbInviteFriendsList">
+      <div class="pb-invite-empty">Loading friends...</div>
     </div>
   </div>
 </div>

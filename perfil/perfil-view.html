@@ -12,6 +12,10 @@
   <link rel="stylesheet" href="./missions.css">
   <meta name="theme-color" content="#ffad00">
   <script type="module" src="../boss/boss-system.js"></script>
+<style>
+  ._friend-link { opacity: 1; transition: opacity 0.15s; }
+  ._friend-link:hover { opacity: 0.72; }
+</style>
 </head>
 
 <body>
@@ -115,7 +119,24 @@
             <p class="perfil-player-id-label">Unite ID:</p>
             <p class="perfil-player-id-display" id="playerIdDisplay">-</p>
           </div>
+          <!-- Add Friend button — só aparece se não é o próprio perfil -->
+          <div id="friendBtnArea" style="margin-top:10px;display:none">
+            <button id="friendActionBtn" onclick="window.toggleFriendAction()" style="
+              padding:7px 18px;border-radius:20px;font-size:0.75rem;font-weight:800;
+              cursor:pointer;transition:all 0.18s;letter-spacing:0.3px;border:2px solid;
+              background:rgba(46,204,113,0.1);border-color:rgba(46,204,113,0.5);color:#2ecc71;">
+              ➕ Add Friend
+            </button>
+          </div>
         </div>
+      </div>
+
+      <!-- Lista de amigos do perfil visualizado -->
+      <div id="friendsListSection" style="display:none;margin:10px 0 4px;padding:10px 14px;
+        background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:12px;">
+        <div style="font-size:0.72rem;font-weight:700;color:#aaa;text-transform:uppercase;
+                    letter-spacing:0.5px;margin-bottom:8px">👥 Friends</div>
+        <div id="friendsList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>  
 
       <!-- ⚔️ BOSS RAID SECTION -->
@@ -206,11 +227,17 @@
     getFirestore, 
     doc, 
     getDoc,
+    setDoc,
     updateDoc,
+    deleteDoc,
     collection, 
     query,
     where,
-    getDocs 
+    getDocs,
+    onSnapshot,
+    arrayUnion,
+    arrayRemove,
+    serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
   // Importar sistema de avaliação
@@ -236,6 +263,9 @@
   const auth = getAuth(app);
   window._rvDb = db; // expor para raid view carregar pokédex do visitante
   let currentUser = null;
+  let _profileUserId = null;  // uid do perfil sendo visitado
+  let _friendStatus  = null;  // null | 'pending_sent' | 'pending_recv' | 'accepted'
+  let _unsubFriends  = null;  // listener de amigos
 
   // ========================================
   // ELEMENTOS DO DOM - BUSCA DE PERFIL
@@ -1669,8 +1699,185 @@ async function carregarBuildsUsuario(uid) {
     }
   });
 
+
+  // ============================================================
+  // SISTEMA DE AMIZADE — perfil-view.html
+  // ============================================================
+  // Estrutura Firestore:
+  //   usuarios/{uid}/friends/{friendUid}  → { status:'accepted'|'pending', since: ts }
+  //   usuarios/{uid}/friendRequests/{fromUid} → { from: uid, fromName: str, ts }
+  // Limite: 15 amigos por usuario.
+  // ============================================================
+
+  async function iniciarSistemaAmizade(myUid, targetUid) {
+    if (!myUid || !targetUid || myUid === targetUid) return;
+    document.getElementById('friendBtnArea').style.display = 'block';
+    await _atualizarBotaoAmigo(myUid, targetUid);
+  }
+
+  async function _atualizarBotaoAmigo(myUid, targetUid) {
+    const btn = document.getElementById('friendActionBtn');
+    if (!btn) return;
+    // Verificar status da amizade
+    const myFriendRef    = doc(db, 'usuarios', myUid, 'friends', targetUid);
+    const theirReqRef    = doc(db, 'usuarios', targetUid, 'friendRequests', myUid);
+    const myReqRef       = doc(db, 'usuarios', myUid, 'friendRequests', targetUid);
+
+    const [myFriendSnap, myReqSnap] = await Promise.all([
+      getDoc(myFriendRef),
+      getDoc(myReqRef),
+    ]);
+
+    if (myFriendSnap.exists() && myFriendSnap.data().status === 'accepted') {
+      _friendStatus = 'accepted';
+      btn.textContent = '✅ Friends';
+      btn.style.borderColor = 'rgba(46,204,113,0.5)';
+      btn.style.color = '#2ecc71';
+      btn.style.background = 'rgba(46,204,113,0.1)';
+    } else if (myFriendSnap.exists() && myFriendSnap.data().status === 'pending') {
+      _friendStatus = 'pending_sent';
+      btn.textContent = '⏳ Request Sent';
+      btn.style.borderColor = 'rgba(255,173,0,0.5)';
+      btn.style.color = '#ffad00';
+      btn.style.background = 'rgba(255,173,0,0.07)';
+    } else if (myReqSnap.exists()) {
+      _friendStatus = 'pending_recv';
+      btn.textContent = '📩 Accept Request';
+      btn.style.borderColor = 'rgba(46,204,113,0.6)';
+      btn.style.color = '#2ecc71';
+      btn.style.background = 'rgba(46,204,113,0.1)';
+    } else {
+      _friendStatus = null;
+      btn.textContent = '➕ Add Friend';
+      btn.style.borderColor = 'rgba(46,204,113,0.5)';
+      btn.style.color = '#2ecc71';
+      btn.style.background = 'rgba(46,204,113,0.1)';
+    }
+  }
+
+  window.toggleFriendAction = async function() {
+    if (!currentUser || !_profileUserId) return;
+    const myUid = currentUser.uid;
+    const btn = document.getElementById('friendActionBtn');
+    btn.disabled = true;
+
+    try {
+      if (_friendStatus === 'accepted') {
+        // Remover amizade
+        if (!confirm('Remove this player from your friends?')) { btn.disabled = false; return; }
+        await Promise.all([
+          deleteDoc(doc(db, 'usuarios', myUid, 'friends', _profileUserId)),
+          deleteDoc(doc(db, 'usuarios', _profileUserId, 'friends', myUid)),
+        ]);
+      } else if (_friendStatus === 'pending_sent') {
+        // Cancelar pedido
+        await Promise.all([
+          deleteDoc(doc(db, 'usuarios', myUid, 'friends', _profileUserId)),
+          deleteDoc(doc(db, 'usuarios', _profileUserId, 'friendRequests', myUid)),
+        ]);
+      } else if (_friendStatus === 'pending_recv') {
+        // Aceitar pedido recebido
+        const mySnap    = await getDoc(doc(db, 'usuarios', myUid));
+        const myData    = mySnap.data() || {};
+        const myName    = myData.displayName || 'Trainer';
+        const myAvatar  = myData.avatar || '';
+        const theirSnap   = await getDoc(doc(db, 'usuarios', _profileUserId));
+        const theirData   = theirSnap.data() || {};
+        const theirName   = theirData.displayName || 'Trainer';
+        const theirAvatar = theirData.avatar || '';
+        // Contar amigos
+        const myFriendsColl = await getDocs(collection(db, 'usuarios', myUid, 'friends'));
+        const accepted = myFriendsColl.docs.filter(d => d.data().status === 'accepted');
+        if (accepted.length >= 15) {
+          alert('You already have 15 friends (maximum). Remove one to add another.');
+          btn.disabled = false; return;
+        }
+        await Promise.all([
+          setDoc(doc(db, 'usuarios', myUid, 'friends', _profileUserId),
+            { status:'accepted', name: theirName, avatar: theirAvatar, since: Date.now() }),
+          setDoc(doc(db, 'usuarios', _profileUserId, 'friends', myUid),
+            { status:'accepted', name: myName, avatar: myAvatar, since: Date.now() }),
+          deleteDoc(doc(db, 'usuarios', myUid, 'friendRequests', _profileUserId)),
+        ]);
+      } else {
+        // Enviar pedido de amizade
+        const mySnap = await getDoc(doc(db, 'usuarios', myUid));
+        const myName = mySnap.data()?.displayName || 'Trainer';
+        // Verificar limite de amigos do alvo
+        const theirFriendsColl = await getDocs(collection(db, 'usuarios', _profileUserId, 'friends'));
+        const theirAccepted = theirFriendsColl.docs.filter(d => d.data().status === 'accepted');
+        if (theirAccepted.length >= 15) {
+          alert('This player already has the maximum of 15 friends.');
+          btn.disabled = false; return;
+        }
+        const theirSnap   = await getDoc(doc(db, 'usuarios', _profileUserId));
+        const theirData   = theirSnap.data() || {};
+        const theirName   = theirData.displayName || 'Trainer';
+        const theirAvatar = theirData.avatar || '';
+        await Promise.all([
+          setDoc(doc(db, 'usuarios', myUid, 'friends', _profileUserId),
+            { status:'pending', name: theirName, avatar: theirAvatar, since: Date.now() }),
+          setDoc(doc(db, 'usuarios', _profileUserId, 'friendRequests', myUid),
+            { from: myUid, fromName: myName, ts: Date.now() }),
+        ]);
+      }
+      await _atualizarBotaoAmigo(myUid, _profileUserId);
+      await carregarListaAmigos(_profileUserId);
+    } catch(e) {
+      console.error('[friend]', e);
+    }
+    btn.disabled = false;
+  };
+
+  async function carregarListaAmigos(uid) {
+    const section = document.getElementById('friendsListSection');
+    const list    = document.getElementById('friendsList');
+    if (!section || !list) return;
+    try {
+      const snap     = await getDocs(collection(db, 'usuarios', uid, 'friends'));
+      const accepted = snap.docs.filter(function(d){ return d.data().status === 'accepted'; });
+      if (!accepted.length) { section.style.display = 'none'; return; }
+      section.style.display = 'block';
+      list.innerHTML = accepted.map(function(d) {
+        var fuid  = d.id;
+        var fname = d.data().name || 'Trainer';
+        var safeName = String(fname).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var avatarSrc = String(d.data().avatar || '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png')
+                          .replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        var fallback  = '../estatisticas-shad/images/backgrounds/pikachu-left-bg.png';
+        return '<a href="perfil-view.html?uid=' + fuid + '" style="'
+          + 'display:inline-flex;align-items:center;gap:7px;'
+          + 'text-decoration:none;transition:opacity 0.15s;padding:2px 0;"'
+          + ' class="_friend-link"'
+          + '>'
+          + '<img src="' + avatarSrc + '"'
+          + ' data-fb="' + fallback + '"'
+          + ' onerror="this.src=this.dataset.fb"'
+          + ' style="width:26px;height:26px;border-radius:50%;object-fit:cover;'
+          + 'border:1.5px solid rgba(255,117,0,0.4);flex-shrink:0;">'
+          + '<span style="font-size:0.75rem;color:#ddd;font-weight:600">' + safeName + '</span>'
+          + '</a>';
+      }).join('');
+    } catch(e) {
+      console.warn('[friends list]', e);
+    }
+  }
+
   // Carregar dados ao iniciar
+  const _pvUrlParams = new URLSearchParams(window.location.search);
+  _profileUserId = _pvUrlParams.get('uid');
   carregarDadosUsuario();
+
+  // Sistema de amizade: iniciar após auth + dados carregados
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    if (user && _profileUserId && user.uid !== _profileUserId) {
+      iniciarSistemaAmizade(user.uid, _profileUserId);
+    }
+    if (_profileUserId) {
+      carregarListaAmigos(_profileUserId);
+    }
+  });
 </script>
 
 <script>

@@ -128,9 +128,17 @@ function sortearBoss(config) {
 }
 
 function gerarPosicao() {
+  // FIX Bug 2/4: usar viewport height (não scrollHeight) e reservar espaço
+  // no topo para que os botões "Create/Join Room" apareçam sempre clicáveis.
+  // margemTopo de 180px = altura do boss sprite (120px) + painel de botões (~60px)
+  const viewH = Math.max(600, window.innerHeight || 600);
+  const viewW = Math.max(800, window.innerWidth  || 800);
+  const margemTopo    = 180;  // reserva espaço para os botões acima do sprite
+  const margemLateral = 160;
+  const margemBase    = 100;
   return {
-    posX: Math.floor(Math.random() * (document.body.scrollWidth  - 160)) + 20,
-    posY: Math.floor(Math.random() * (document.body.scrollHeight - 160)) + 20
+    posX: Math.floor(Math.random() * (viewW - margemLateral)) + 20,
+    posY: Math.floor(Math.random() * (viewH - margemTopo - margemBase)) + margemTopo,
   };
 }
 

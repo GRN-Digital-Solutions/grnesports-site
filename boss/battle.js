@@ -292,7 +292,7 @@ const LEARNSETS_BATTLE = {
   chimchar:   [[1,'scratch'],[1,'leer'],[5,'ember'],[9,'taunt'],[13,'fury_swipes'],[17,'flame_wheel'],[21,'nasty_plot'],[25,'torment'],[29,'facade'],[33,'fire_spin'],[37,'slack_off'],[41,'flamethrower'],[45,'mach_punch'],[49,'flare_blitz']],
   tepig:      [[1,'tackle'],[1,'tail_whip'],[5,'ember'],[9,'odor_sleuth'],[13,'defense_curl'],[17,'flame_charge'],[21,'smog'],[25,'rollout'],[29,'take_down'],[33,'heat_crash'],[37,'assurance'],[41,'flamethrower'],[45,'head_smash'],[53,'flare_blitz']],
   fennekin:   [[1,'scratch'],[1,'tail_whip'],[5,'ember'],[11,'howl'],[15,'flame_charge'],[21,'psybeam'],[25,'fire_spin'],[31,'lucky_chant'],[35,'light_screen'],[41,'psyshock'],[45,'flamethrower'],[51,'will_o_wisp'],[55,'psychic_move'],[65,'fire_blast']],
-  litten:     [[1,'scratch'],[1,'growl'],[4,'ember'],[7,'lick'],[12,'bite'],[15,'double_kick'],[20,'fire_fang'],[23,'roar'],[28,'swagger'],[31,'flamethrower'],[36,'scary_face'],[39,'crunch'],[44,'outrage'],[47,'flare_blitz']],
+  litten:     [[1,'growl'],[1,'scratch'],[3,'ember'],[6,'lick'],[9,'roar'],[12,'fury_swipes'],[15,'bite'],[18,'double_kick'],[21,'fire_fang'],[24,'scary_face'],[27,'swagger'],[30,'flamethrower'],[33,'thrash'],[36,'flare_blitz']],
   scorbunny:  [[1,'tackle'],[1,'growl'],[4,'quick_attack'],[8,'ember'],[12,'headbutt'],[16,'flame_charge'],[20,'agility'],[24,'double_kick'],[28,'fire_spin'],[32,'bounce'],[36,'flamethrower'],[40,'high_jump_kick'],[44,'fire_blast'],[48,'pyro_ball']],
   fuecoco:    [[1,'tackle'],[1,'leer'],[4,'ember'],[8,'bite'],[12,'headbutt'],[16,'fire_fang'],[20,'stomping_tantrum'],[24,'hex'],[28,'crunch'],[32,'bulldoze'],[36,'shadow_ball'],[40,'flamethrower'],[44,'slack_off'],[48,'fire_blast'],[52,'overheat']],
   squirtle:   [[1,'tackle'],[1,'tail_whip'],[3,'water_gun'],[6,'withdraw'],[9,'bubble'],[12,'bite'],[15,'rapid_spin'],[18,'protect'],[21,'water_pulse'],[24,'aqua_tail'],[28,'skull_bash'],[32,'iron_defense'],[36,'rain_dance'],[40,'hydro_pump']],
@@ -852,6 +852,8 @@ onAuthStateChanged(auth, async user => {
     _battleSnap = val;
     // ── Sincronizar _bossStatus do RTDB — universal entre todos os players ──
     if (val.bossStatus) _bossStatus = { ..._bossStatus, ...val.bossStatus };
+    // ── Processar animação remota (outros players) ────────────
+    _processarAnimRemota(val);
     // Sincronizar statStages do Firebase para _playerStages local (todos os players)
     const playersSnap = val.players || {};
     Object.entries(playersSnap).forEach(([uid, p]) => {
@@ -1449,37 +1451,101 @@ function limparHistorico(){ _battleHistory.length = 0; }
 // ── Animação de golpe (GIF sobre o sprite alvo) ──────────────
 // GIFs ficam em /boss/img-moves/{move_key}.gif
 // duration: tempo em ms que o GIF fica visível (default 600ms)
-function mostrarAnimacaoGolpe(targetEl, moveKey, duration = 600) {
+// ── Renderizar GIF localmente num elemento do DOM ────────────
+function _renderAnimGif(targetEl, moveKey, duration, invertX) {
   if (!targetEl || !moveKey) return Promise.resolve();
   return new Promise(res => {
     const img = document.createElement('img');
     img.src = `/boss/img-moves/${moveKey}.gif`;
+    const scale = invertX ? 'scaleX(-1)' : '';
+
+    // FIX GIF clipping: usar position:fixed ancorado ao centro do elemento alvo
+    // via getBoundingClientRect(). Isso ignora qualquer overflow:hidden dos containers.
+    // Tamanho reduzido para não dominar a tela — max 260px desktop, 180px mobile.
+    const isMobile = window.innerWidth <= 640;
+    const gifSize  = isMobile ? '180px' : '260px';
+
     img.style.cssText = [
-      'position:absolute',
-      'top:50%', 'left:50%',
-      'transform:translate(-50%,-50%)',
-      'width:clamp(240px,45vw,420px)',
-      'height:auto',
-      'z-index:50',
+      'position:fixed',
+      'z-index:9000',
       'pointer-events:none',
       'image-rendering:auto',
+      'width:' + gifSize,
+      'height:auto',
+      'max-height:40vh',
+      'object-fit:contain',
+      ('transform:translate(-50%,-50%) ' + scale).trim(),
       'animation:moveGifPop 0.15s ease-out',
+      'transition:opacity 0.15s ease',
     ].join(';');
-    // Se a imagem não existir, resolve imediatamente sem mostrar nada
+
+    // Posicionar sobre o centro do elemento alvo usando coordenadas da viewport
+    function _posicionarGif() {
+      const rect = targetEl.getBoundingClientRect();
+      const cx   = rect.left + rect.width  / 2;
+      const cy   = rect.top  + rect.height / 2;
+      img.style.left = cx + 'px';
+      img.style.top  = cy + 'px';
+    }
+
     img.onerror = () => { img.remove(); res(); };
     img.onload  = () => {
-      // Garantir que o container do alvo é relative
-      const prev = getComputedStyle(targetEl).position;
-      if (prev === 'static') targetEl.style.position = 'relative';
-      targetEl.appendChild(img);
+      _posicionarGif();
+      document.body.appendChild(img);
       setTimeout(() => {
         img.style.opacity = '0';
-        img.style.transition = 'opacity 0.15s ease';
         setTimeout(() => { img.remove(); res(); }, 150);
       }, duration);
     };
   });
 }
+
+// ── Broadcast animação via RTDB — todos os clients veem ───────
+// target: 'boss' | 'player:{uid}' | 'self:{uid}'
+async function mostrarAnimacaoGolpe(targetEl, moveKey, duration = 600, invertX = false, broadcast = false, rtdbTarget = null) {
+  // Render local imediato
+  await _renderAnimGif(targetEl, moveKey, duration, invertX);
+  // Broadcast para outros players via RTDB
+  if (broadcast && _battleRef && moveKey) {
+    try {
+      const ts = Date.now();
+      // Marcar ts ANTES de gravar no RTDB — evita que o onValue do próprio
+      // executor dispare _processarAnimRemota e renderize uma 2ª vez
+      _lastAnimTs = ts;
+      await update(_battleRef, {
+        animEvent: {
+          moveKey,
+          target:   rtdbTarget || 'boss',
+          invertX:  invertX,
+          duration: duration,
+          ts,
+        }
+      });
+    } catch(e) { /* silencioso */ }
+  }
+}
+
+// ── Listener de animações remotas (onValue já registrado — ver abaixo) ─
+function _processarAnimRemota(val) {
+  const anim = val?.animEvent;
+  if (!anim || !anim.moveKey) return;
+  // Evitar re-processar o mesmo evento
+  if (_lastAnimTs === anim.ts) return;
+  _lastAnimTs = anim.ts;
+  // Determinar elemento alvo
+  let el = null;
+  if (anim.target === 'boss') {
+    el = document.querySelector('.boss-sprite-wrap');
+  } else if (anim.target?.startsWith('player:')) {
+    const uid = anim.target.split(':')[1];
+    el = document.getElementById(`prow-${uid}`);
+  } else if (anim.target?.startsWith('self:')) {
+    const uid = anim.target.split(':')[1];
+    el = document.getElementById(`prow-${uid}`);
+  }
+  if (el) _renderAnimGif(el, anim.moveKey, anim.duration || 600, !!anim.invertX);
+}
+let _lastAnimTs = 0;
 
 function _enriquecerLog(txt) {
   // Aplicar classes CSS para destacar partes do log automaticamente
@@ -1606,22 +1672,45 @@ window.btOpenBag = function(){
   let html = '<button class="sub-back" onclick="setSubPanel(null)">← Back</button>';
   let found = false;
 
-  Object.entries(ITEM_INFO).forEach(([key, info]) => {
-    const qty = bag[key] || 0;
-    if (!qty) return;
-    found = true;
-    // Pokébola só disponível na fase de captura
-    const disabled = (info.isBall && !_capturePhase) ? 'disabled title="Only usable after boss is defeated"' : '';
-    const onclickFn = info.isEther ? `window.btUsarEther('${key}')` : `window.btUsarItem('${key}')`;
-    html += `<button class="sub-btn" ${disabled} onclick="${onclickFn}">
-      <img src="/boss/img-items/${info.img}.png" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"
-           onerror="this.style.display='none'">
-      ${info.name} ×${qty}
-      ${info.isBall ? '<span style="color:#888;font-size:0.6rem">(capture)</span>' : ''}
-      ${info.isEther ? '<span style="color:#9b59b6;font-size:0.6rem">(PP +20)</span>' : ''}
-    </button>`;
-  });
-  if (!found) html += '<div style="font-size:0.7rem;color:#555;padding:8px">Your bag is empty.</div>';
+  // FIX Bug 5: Na fase de CAPTURA → mostrar APENAS pokébolas + aviso urgente.
+  // Na batalha normal → mostrar todos os itens EXCETO pokébolas.
+  if (_capturePhase) {
+    html += `<div style="font-size:0.72rem;font-weight:800;color:#ff3333;text-align:center;padding:6px 10px 4px;letter-spacing:0.3px;border-bottom:1px solid rgba(255,60,60,0.25);margin-bottom:6px;">
+      ⚠️ THROW A POKÉ BALL! Time is running out!
+    </div>`;
+    const BALL_KEYS = ['pokebola','great_ball','ultra_ball'];
+    BALL_KEYS.forEach(key => {
+      const info = ITEM_INFO[key];
+      const qty  = bag[key] || 0;
+      if (!qty) return;
+      found = true;
+      html += `<button class="sub-btn" onclick="window.btUsarItem('${key}')" style="border-color:rgba(255,173,0,0.6);font-weight:700;">
+        <img src="/boss/img-items/${info.img}.png" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"
+             onerror="this.style.display='none'">
+        ${info.name} ×${qty}
+        <span style="color:#ffad00;font-size:0.6rem;margin-left:auto">⚡ Throw!</span>
+      </button>`;
+    });
+    if (!found) {
+      html += '<div style="font-size:0.7rem;color:#ff4444;padding:8px;text-align:center">❌ No Poké Balls!<br>Press <b>Pass</b> to skip.</div>';
+    }
+  } else {
+    // Batalha normal — todos os itens, exceto pokébolas (só na captura)
+    Object.entries(ITEM_INFO).forEach(([key, info]) => {
+      const qty = bag[key] || 0;
+      if (!qty) return;
+      if (info.isBall) return; // pokébolas reservadas para a fase de captura
+      found = true;
+      const onclickFn = info.isEther ? `window.btUsarEther('${key}')` : `window.btUsarItem('${key}')`;
+      html += `<button class="sub-btn" onclick="${onclickFn}">
+        <img src="/boss/img-items/${info.img}.png" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"
+             onerror="this.style.display='none'">
+        ${info.name} ×${qty}
+        ${info.isEther ? '<span style="color:#9b59b6;font-size:0.6rem">(PP +20)</span>' : ''}
+      </button>`;
+    });
+    if (!found) html += '<div style="font-size:0.7rem;color:#555;padding:8px">Your bag is empty.</div>';
+  }
 
   setSubPanel(html);
 };
@@ -2006,8 +2095,14 @@ window.btUsarGolpe = async function(idx, moveKey){
     });
     // ────────────────────────────────────────────────────────────
 
-    // Animar golpe sobre o boss (status move)
-  await mostrarAnimacaoGolpe(document.querySelector('.boss-sprite-wrap'), moveKey);
+    // Animar golpe: buff/heal → sobre si próprio; debuff/status → sobre o boss
+    {
+      const selfEffects = ['buff','double_buff','heal','leech_seed'];
+      const isSelfAnim  = selfEffects.includes(eff);
+      const animTarget  = isSelfAnim ? document.getElementById(`prow-${_uid}`) : document.querySelector('.boss-sprite-wrap');
+      const rtdbTgt     = isSelfAnim ? `self:${_uid}` : 'boss';
+      await mostrarAnimacaoGolpe(animTarget, moveKey, 600, false, true, rtdbTgt);
+    }
   await logAction(`${getNick()}'s ${cap(me.pokemon)} used ${move.name}!${logExtra}`);
     await processarStatusDanoPlayer();
     await processarHeldItemEndTurn();
@@ -2194,8 +2289,8 @@ window.btUsarGolpe = async function(idx, moveKey){
     logTxt += ' The boss has been defeated! Prepare to throw a Poké Ball!';
   }
 
-  // Animar golpe sobre o boss (damaging move)
-  await mostrarAnimacaoGolpe(document.querySelector('.boss-sprite-wrap'), moveKey);
+  // Animar golpe sobre o boss (damaging move) — broadcast para todos
+  await mostrarAnimacaoGolpe(document.querySelector('.boss-sprite-wrap'), moveKey, 600, false, true, 'boss');
   await update(_battleRef, updates);
   await logAction(logTxt);
 
@@ -2906,7 +3001,7 @@ async function bossAtaca(){
     // (move é objeto; buscar a key no MOVES_DB pelo nome)
     const bossMoveKey = Object.keys(MOVES_DB).find(k => MOVES_DB[k].name === move.name) || '';
     const targetImgEl = document.getElementById(`prow-${targetUid}`);
-    await mostrarAnimacaoGolpe(targetImgEl, bossMoveKey, 500);
+    await mostrarAnimacaoGolpe(targetImgEl, bossMoveKey, 500, true, true, `player:${targetUid}`); // broadcast
     showPlayerFloat(targetUid, `-${dano}`);
     logParts.push(`${players[targetUid].nick || 'Player'}'s ${cap(p.pokemon)} took ${dano} damage!`);
     if (res.eff > 1) logParts.push('Super effective!');
@@ -3283,12 +3378,21 @@ async function avancarFilaCaptura(resultado) {
 let _captureTimer = null;
 function iniciarCaptureTimer(){
   pararCaptureTimer();
-  const el = document.getElementById('captureTimer');
-  if (el) { el.style.display = 'block'; el.textContent = '10'; }
+  const el   = document.getElementById('captureTimer');
+  const warn = document.getElementById('captureTimerWarn');
+  if (el)   { el.style.display = 'block'; el.textContent = '10'; el.classList.remove('urgent'); }
+  if (warn) { warn.style.display = 'block'; warn.classList.remove('urgent');
+    warn.textContent = '\u26a1 Open your Bag and throw a Pok\u00e9 Ball before time runs out!'; }
   let t = 10;
   _captureTimer = setInterval(async () => {
     t--;
-    if (el) el.textContent = t;
+    if (el) { el.textContent = t; if (t <= 5) el.classList.add('urgent'); }
+    if (warn) {
+      if (t <= 5) {
+        warn.classList.add('urgent');
+        warn.textContent = '\ud83d\udea8 HURRY! Throw a Pok\u00e9 Ball NOW or lose your chance!';
+      }
+    }
     if (t <= 0){
       pararCaptureTimer();
       if (_myTurn && !_actionDone){
@@ -3301,8 +3405,10 @@ function iniciarCaptureTimer(){
 }
 function pararCaptureTimer(){
   if (_captureTimer){ clearInterval(_captureTimer); _captureTimer = null; }
-  const el = document.getElementById('captureTimer');
-  if (el) el.style.display = 'none';
+  const el   = document.getElementById('captureTimer');
+  const warn = document.getElementById('captureTimerWarn');
+  if (el)   { el.style.display = 'none'; el.classList.remove('urgent'); }
+  if (warn) { warn.style.display = 'none'; warn.classList.remove('urgent'); }
 }
 
 // ══════════════════════════════════════════════════════════════

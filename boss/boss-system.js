@@ -423,8 +423,10 @@ function atualizarEstadoBoss(data) {
   // sem depender de setTimeout calculado no momento do carregamento da página.
   iniciarWatcherTransicao(data);
 
-  // ---- TARJA (apenas na index.html) ----
-  if (paginaAtual === 'index.html' && tarja) {
+  // ---- TARJA (em todas as páginas, não apenas index.html) ----
+  // FIX Bug 3: exibir a contagem regressiva em qualquer página onde boss-system.js
+  // esteja carregado — inclui sobre, contato, loja, pre-battle, etc.
+  if (tarja) {
     if (data.estado === 'anunciando') {
       tarja.style.display = 'flex';
       tarja.className = 'boss-tarja boss-tarja-anunciando';
@@ -507,7 +509,8 @@ function mostrarBotoesBoss(sprite, boss) {
     </button>
   `;
 
-  // Posicionar acima do sprite
+  // FIX Bug 4: se o sprite está perto do topo, abrir o painel ABAIXO dele.
+  // Caso contrário, abrir acima (comportamento original).
   const rect = sprite.getBoundingClientRect();
   const scrollY = window.scrollY || document.documentElement.scrollTop;
   const scrollX = window.scrollX || document.documentElement.scrollLeft;
@@ -516,11 +519,19 @@ function mostrarBotoesBoss(sprite, boss) {
   panel.style.display   = 'flex';
   panel.style.flexDirection = 'row';
   panel.style.gap       = '10px';
-  // Centralizar acima do sprite
+  // Centralizar horizontalmente
   const panelW = 280;
   const spriteX = rect.left + scrollX + (rect.width / 2);
   panel.style.left = Math.max(8, spriteX - panelW/2) + 'px';
-  panel.style.top  = (rect.top + scrollY - 64) + 'px';
+  // Se o sprite está nos primeiros 80px do viewport, abrir abaixo; senão acima
+  const THRESHOLD_TOPO = 80;
+  if (rect.top < THRESHOLD_TOPO) {
+    // Abrir ABAIXO do sprite (rect.bottom + scrollY + margem)
+    panel.style.top = (rect.bottom + scrollY + 8) + 'px';
+  } else {
+    // Abrir ACIMA (comportamento original)
+    panel.style.top  = (rect.top + scrollY - 64) + 'px';
+  }
 
   document.body.appendChild(panel);
 
@@ -658,21 +669,22 @@ function criarSpriteBoss(boss, posX, posY) {
   sprite.id    = 'boss-sprite-flutuante';
   sprite.title = `Boss: ${boss.nome} — Clique para enfrentar!`;
 
-// ✅ Limita a posição à área visível da página atual
-// Garante que o boss sempre aparece dentro dos limites do conteúdo visível
+// FIX Bug 4: garantir que o boss sempre aparece dentro da área visível.
+// Usa viewport height (não scrollHeight) e reserva margemTopo para os botões.
+const MARGEM_TOPO_BOSS = 180; // altura sprite + painel de botões acima
 const alturaMaxima = Math.max(
-  document.documentElement.clientHeight,  // altura visível do viewport
-  document.body.scrollHeight              // altura real do conteúdo
+  document.documentElement.clientHeight,
+  window.innerHeight || 600
 ) - 160;
 
 const larguraMaxima = Math.max(
   document.documentElement.clientWidth,
-  document.body.scrollWidth
+  window.innerWidth || 800
 ) - 160;
 
-// Usa a posição do Firebase mas clampeia para não sair da área útil
-const x = posX != null ? Math.min(posX, larguraMaxima) : Math.floor(Math.random() * larguraMaxima) + 20;
-const y = posY != null ? Math.min(posY, alturaMaxima)  : Math.floor(Math.random() * alturaMaxima)  + 80;
+// Clampear: Y mínimo = margemTopo (botões ficam visíveis acima do sprite)
+const x = posX != null ? Math.min(Math.max(20, posX), larguraMaxima) : Math.floor(Math.random() * larguraMaxima) + 20;
+const y = posY != null ? Math.min(Math.max(MARGEM_TOPO_BOSS, posY), alturaMaxima) : Math.floor(Math.random() * (alturaMaxima - MARGEM_TOPO_BOSS)) + MARGEM_TOPO_BOSS;
 
 sprite.style.left = x + 'px';
 sprite.style.top  = y + 'px';

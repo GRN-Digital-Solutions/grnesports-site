@@ -1447,6 +1447,94 @@ async function usarItemNoPokemon(itemKey, slotIdx) {
 // ============================================================
 // XP (Medium Fast: L³)
 // ============================================================
+// ============================================================
+// MODAL: FORÇAR TROCA DE NICK ANTES DE JOGAR
+// ============================================================
+function _mostrarModalTrocarNick() {
+  document.getElementById('_raidNickModal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '_raidNickModal';
+  overlay.style.cssText = [
+    'position:fixed','inset:0','background:rgba(0,0,0,0.88)',
+    'display:flex','align-items:center','justify-content:center','z-index:99999',
+  ].join(';');
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(160deg,#0e0e1e,#080810);
+                border:2px solid rgba(255,117,0,0.5);border-radius:18px;
+                padding:30px 26px;max-width:370px;width:92%;text-align:center;
+                box-shadow:0 0 60px rgba(255,117,0,0.18);">
+      <div style="font-size:2.2rem;margin-bottom:10px">✏️</div>
+      <div style="font-size:1rem;font-weight:800;color:#ff9500;text-transform:uppercase;
+                  letter-spacing:1px;margin-bottom:8px">Set Your Trainer Name</div>
+      <p style="font-size:0.72rem;color:#777;margin-bottom:18px;line-height:1.6">
+        You need a custom trainer name before joining raids.<br>
+        <b style="color:#ffad00">Anonymous</b> names are not allowed in battle!
+      </p>
+      <input id="_raidNickInput"
+        maxlength="20"
+        placeholder="Your trainer name..."
+        style="width:100%;background:rgba(255,255,255,0.05);border:2px solid rgba(255,117,0,0.4);
+               border-radius:10px;padding:12px 14px;font-size:0.95rem;color:#ffad00;
+               outline:none;text-align:center;font-weight:700;margin-bottom:6px;
+               letter-spacing:0.5px;transition:border-color 0.2s;">
+      <div id="_raidNickErr" style="font-size:0.65rem;color:#ff4444;min-height:16px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:10px">
+        <button id="_raidNickCancel"
+          style="flex:1;padding:10px;background:rgba(255,255,255,0.05);
+                 border:1px solid rgba(255,255,255,0.12);border-radius:9px;
+                 color:#666;cursor:pointer;font-size:0.78rem">Cancel</button>
+        <button id="_raidNickSave"
+          style="flex:1;padding:10px;
+                 background:linear-gradient(135deg,rgba(255,117,0,0.28),rgba(255,173,0,0.18));
+                 border:2px solid rgba(255,117,0,0.6);border-radius:9px;
+                 color:#ffad00;cursor:pointer;font-size:0.78rem;font-weight:800">
+          Save & Play ⚔️</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const input  = overlay.querySelector('#_raidNickInput');
+  const errEl  = overlay.querySelector('#_raidNickErr');
+  const saveBtn= overlay.querySelector('#_raidNickSave');
+  const canBtn = overlay.querySelector('#_raidNickCancel');
+  input.focus();
+
+  input.addEventListener('focus', () => { input.style.borderColor='rgba(255,173,0,0.7)'; });
+  input.addEventListener('blur',  () => { input.style.borderColor='rgba(255,117,0,0.4)'; });
+
+  canBtn.addEventListener('click', () => overlay.remove());
+
+  async function salvarNick() {
+    const nick = input.value.trim();
+    if (!nick || nick.length < 2) { errEl.textContent = 'Name must be at least 2 characters.'; return; }
+    if (nick.toLowerCase() === 'anonymous') { errEl.textContent = 'Choose a different name.'; return; }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      const { getFirestore, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+      const { getAuth } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js');
+      const { updateProfile } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js');
+      const fsdb = getFirestore();
+      const auth = getAuth();
+      await updateDoc(doc(fsdb, 'usuarios', auth.currentUser.uid), { displayName: nick });
+      await updateProfile(auth.currentUser, { displayName: nick });
+      if (_userData) _userData.displayName = nick;
+      overlay.remove();
+      // Prosseguir com o jogo
+      await salvarRaidStatus('choosing');
+      _userData.raidStatus = 'choosing';
+      renderizarBossRaid();
+    } catch(e) {
+      errEl.textContent = 'Error saving. Try again.';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save & Play \u2694\ufe0f';
+    }
+  }
+
+  saveBtn.addEventListener('click', salvarNick);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') salvarNick(); });
+}
+
 function xpParaNivel(nivel) {
   return Math.pow(nivel, 3);
 }
@@ -2142,13 +2230,21 @@ function renderPrimeiraVez(container) {
   });
 
   document.getElementById('btnRaidJogar').addEventListener('click', async () => {
+    // Fix 2: Obrigar troca de nick antes de jogar
+    const nickAtual = (_userData?.displayName || '').trim();
+    const nickInvalido = !nickAtual || nickAtual === 'Anonymous' ||
+      nickAtual.toLowerCase() === 'anonymous' || nickAtual.includes('@');
+    if (nickInvalido) {
+      _mostrarModalTrocarNick();
+      return;
+    }
     try {
       await salvarRaidStatus('choosing');
       _userData.raidStatus = 'choosing';
       renderizarBossRaid();
     } catch (err) {
       console.error('[BossRaid]', err);
-      alert('❌ Error starting raid. Try again.');
+      alert('\u274c Error starting raid. Try again.');
     }
   });
 }
