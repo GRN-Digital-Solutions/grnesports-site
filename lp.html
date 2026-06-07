@@ -397,8 +397,8 @@
       display: none;
       position: fixed;
       inset: 0;
-      z-index: 999;
-      background: rgba(5,8,16,0.97);
+      z-index: 1000; 
+      background: rgba(0,0,0,0.97);
       backdrop-filter: blur(20px);
       flex-direction: column;
       align-items: center;
@@ -1716,7 +1716,10 @@
 
       .navbar__nav { display: none; }
       .navbar__cta .btn-outline { display: none; }
+      .navbar__cta { display: none; }
       .navbar__hamburger { display: flex; }
+      .mobile-menu.open { display: flex; }
+      .mobile-menu__close { z-index: 1001; }
 
       .services__grid { grid-template-columns: 1fr; }
       .why__grid { grid-template-columns: 1fr; }
@@ -2529,12 +2532,14 @@
       mobileMenu.classList.add('open');
       document.body.style.overflow = 'hidden';
       hamburger.setAttribute('aria-expanded', 'true');
+      hamburger.style.display = 'none';
     }
 
     function closeMenu() {
       mobileMenu.classList.remove('open');
       document.body.style.overflow = '';
       hamburger.setAttribute('aria-expanded', 'false');
+      hamburger.style.display = 'flex';
     }
 
     hamburger.addEventListener('click', openMenu);
