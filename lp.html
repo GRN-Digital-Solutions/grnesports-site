@@ -116,7 +116,6 @@
     img {
       max-width: 100%;
       height: auto;
-      loading: lazy;
     }
 
     a {
@@ -397,7 +396,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      z-index: 1000; 
+      z-index: 1000;
       background: rgba(0,0,0,0.97);
       backdrop-filter: blur(20px);
       flex-direction: column;
@@ -431,7 +430,10 @@
     }
 
     /* ======================================
-       HERO
+       HERO — FIX PRINCIPAL
+       O .hero__visual agora é filho direto
+       do .container que tem display:grid,
+       participando da segunda coluna.
     ====================================== */
     .hero {
       min-height: 100vh;
@@ -442,11 +444,24 @@
       overflow: hidden;
     }
 
+    /* O container ocupa todo o espaço e
+       define o grid de duas colunas */
+    .hero > .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      gap: 60px;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
     .hero__bg {
       position: absolute;
       inset: 0;
       pointer-events: none;
       overflow: hidden;
+      z-index: 0;
     }
 
     .hero__glow-1 {
@@ -481,10 +496,10 @@
       mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
     }
 
+    /* Coluna esquerda do hero */
     .hero__content {
       position: relative;
       z-index: 2;
-      max-width: 780px;
     }
 
     .hero__badge {
@@ -511,7 +526,7 @@
     }
 
     .hero__title {
-      font-size: clamp(44px, 6.5vw, 82px);
+      font-size: clamp(44px, 5.5vw, 76px);
       font-weight: 800;
       line-height: 1.05;
       letter-spacing: -0.03em;
@@ -538,10 +553,10 @@
     }
 
     .hero__sub {
-      font-size: clamp(16px, 2vw, 19px);
+      font-size: clamp(15px, 1.6vw, 18px);
       color: var(--c-text-2);
       line-height: 1.65;
-      max-width: 600px;
+      max-width: 520px;
       margin-bottom: 40px;
       font-weight: 300;
       animation: fade-up 0.8s ease 0.2s both;
@@ -588,16 +603,15 @@
       letter-spacing: 0.04em;
     }
 
+    /* Coluna direita do hero — visual/orbit */
     .hero__visual {
-      position: absolute;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 45%;
-      max-width: 560px;
-      z-index: 1;
-      animation: fade-left 1s ease 0.3s both;
-      pointer-events: none;
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fade-up 1s ease 0.3s both;
     }
 
     /* ======================================
@@ -605,6 +619,7 @@
     ====================================== */
     .tech-orbit {
       width: 100%;
+      max-width: 480px;
       aspect-ratio: 1;
       position: relative;
       display: flex;
@@ -723,8 +738,6 @@
       gap: 60px;
       align-items: center;
     }
-
-    .problem__left { }
 
     .problem__lead {
       font-size: clamp(17px, 2vw, 20px);
@@ -999,9 +1012,7 @@
       margin-bottom: 14px;
     }
 
-    .fcard__icon {
-      font-size: 20px;
-    }
+    .fcard__icon { font-size: 20px; }
 
     .fcard__title {
       font-family: var(--font-display);
@@ -1441,7 +1452,7 @@
     .form-group select:focus,
     .form-group textarea:focus {
       border-color: var(--c-accent);
-      box-shadow: 0 0 0 3px rgba(255,126,0,0.12) 0%, transparent 70%;
+      box-shadow: 0 0 0 3px rgba(255,126,0,0.12);
     }
 
     .form-group textarea {
@@ -1657,11 +1668,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    @keyframes fade-left {
-      from { opacity: 0; transform: translate(40px, -50%); }
-      to   { opacity: 1; transform: translate(0, -50%); }
-    }
-
     @keyframes pulse-glow {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.1); opacity: 0.7; }
@@ -1696,8 +1702,21 @@
     @media (max-width: 1024px) {
       :root { --section-py: 80px; }
 
+      /* Hero colapsa para 1 coluna e esconde o visual */
+      .hero > .container {
+        grid-template-columns: 1fr;
+      }
+
       .hero__visual { display: none; }
-      .hero__content { max-width: 100%; }
+
+      .hero__content {
+        text-align: center;
+      }
+
+      .hero__badge { justify-content: center; }
+      .hero__actions { justify-content: center; }
+      .hero__stats { justify-content: center; }
+      .hero__sub { margin-left: auto; margin-right: auto; }
 
       .services__grid { grid-template-columns: repeat(2, 1fr); }
       .why__grid { grid-template-columns: repeat(2, 1fr); }
@@ -1738,15 +1757,11 @@
 </head>
 <body>
 
-  <!-- ======================================
-       NAVBAR
-  ====================================== -->
+  <!-- NAVBAR -->
   <header class="navbar" id="navbar" role="banner">
     <div class="container">
       <div class="navbar__inner">
         <a href="#inicio" class="navbar__logo" aria-label="GRN Digital Solutions">
-          <!-- LOGO NAVBAR: troque o src pelo caminho da sua logo (versão horizontal ou somente símbolo, preferencialmente com fundo transparente) -->
-          <!-- Exemplo: src="assets/images/logo-grn-white.png" -->
           <img
             src="./img-site/grn_digital.png"
             alt="GRN Digital Solutions"
@@ -1795,9 +1810,7 @@
   </div>
 
   <main>
-    <!-- ======================================
-         HERO
-    ====================================== -->
+    <!-- HERO -->
     <section class="hero" id="inicio" aria-labelledby="hero-title">
       <div class="hero__bg" aria-hidden="true">
         <div class="hero__glow-1"></div>
@@ -1805,7 +1818,10 @@
         <div class="hero__grid"></div>
       </div>
 
+      <!-- ✅ CONTAINER COM GRID: hero__content + hero__visual DENTRO -->
       <div class="container">
+
+        <!-- Coluna esquerda -->
         <div class="hero__content">
           <div class="hero__badge">
             <span class="hero__badge-dot" aria-hidden="true"></span>
@@ -1849,29 +1865,31 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="hero__visual" aria-hidden="true">
-        <div class="tech-orbit">
-          <div class="orbit-ring orbit-ring-1">
-            <div class="orbit-node" title="Mobile">📱</div>
-          </div>
-          <div class="orbit-ring orbit-ring-2">
-            <div class="orbit-node" title="Cloud">☁️</div>
-            <div class="orbit-node" title="Database">🗄️</div>
-          </div>
-          <div class="orbit-ring orbit-ring-3">
-            <div class="orbit-node" title="API">⚡</div>
-            <div class="orbit-node" title="Security">🔐</div>
-            <div class="orbit-node" title="Analytics">📊</div>
-          </div>
-          <div class="orbit-core">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/>
-            </svg>
+        <!-- ✅ Coluna direita — agora DENTRO do container/grid -->
+        <div class="hero__visual" aria-hidden="true">
+          <div class="tech-orbit">
+            <div class="orbit-ring orbit-ring-1">
+              <div class="orbit-node" title="Mobile">📱</div>
+            </div>
+            <div class="orbit-ring orbit-ring-2">
+              <div class="orbit-node" title="Cloud">☁️</div>
+              <div class="orbit-node" title="Database">🗄️</div>
+            </div>
+            <div class="orbit-ring orbit-ring-3">
+              <div class="orbit-node" title="API">⚡</div>
+              <div class="orbit-node" title="Security">🔐</div>
+              <div class="orbit-node" title="Analytics">📊</div>
+            </div>
+            <div class="orbit-core">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/>
+              </svg>
+            </div>
           </div>
         </div>
-      </div>
+
+      </div><!-- /container -->
     </section>
 
     <!-- Marquee -->
@@ -1896,9 +1914,7 @@
       </div>
     </div>
 
-    <!-- ======================================
-         PROBLEM SECTION
-    ====================================== -->
+    <!-- PROBLEM SECTION -->
     <section class="section section--alt" id="problema" aria-labelledby="problema-title">
       <div class="container">
         <div class="problem__grid">
@@ -1953,9 +1969,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         SERVICES
-    ====================================== -->
+    <!-- SERVICES -->
     <section class="section" id="servicos" aria-labelledby="servicos-title">
       <div class="container">
         <div class="services__header text-center">
@@ -2010,9 +2024,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         FOR WHOM
-    ====================================== -->
+    <!-- FOR WHOM -->
     <section class="section section--alt" id="para-quem" aria-labelledby="paraquem-title">
       <div class="container">
         <div class="forwhom__grid">
@@ -2085,9 +2097,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         PROCESS
-    ====================================== -->
+    <!-- PROCESS -->
     <section class="section" id="processo" aria-labelledby="processo-title">
       <div class="container">
         <div class="text-center" style="max-width:560px;margin:0 auto 64px">
@@ -2130,9 +2140,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         DIFFERENTIALS
-    ====================================== -->
+    <!-- DIFFERENTIALS -->
     <section class="section section--surface" id="diferenciais" aria-labelledby="diferenciais-title">
       <div class="container">
         <div class="text-center" style="max-width:560px;margin:0 auto 60px">
@@ -2175,9 +2183,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         BENEFITS
-    ====================================== -->
+    <!-- BENEFITS -->
     <section class="section" id="beneficios" aria-labelledby="beneficios-title">
       <div class="container">
         <div class="benefits__inner">
@@ -2247,9 +2253,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         FAQ
-    ====================================== -->
+    <!-- FAQ -->
     <section class="section section--alt" id="faq" aria-labelledby="faq-title">
       <div class="container">
         <div class="text-center" style="margin-bottom:56px">
@@ -2331,9 +2335,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         CONTACT FORM
-    ====================================== -->
+    <!-- CONTACT FORM -->
     <section class="section" id="contato" aria-labelledby="contato-title">
       <div class="container">
         <div class="contact__inner">
@@ -2423,9 +2425,7 @@
       </div>
     </section>
 
-    <!-- ======================================
-         CTA FINAL
-    ====================================== -->
+    <!-- CTA FINAL -->
     <section class="cta-final text-center" aria-labelledby="cta-title">
       <div class="cta-final__bg" aria-hidden="true"></div>
       <div class="container">
@@ -2449,16 +2449,20 @@
     </section>
   </main>
 
-  <!-- ======================================
-       FOOTER
-  ====================================== -->
+  <!-- FOOTER -->
   <footer class="footer" role="contentinfo">
     <div class="container">
       <div class="footer__grid">
         <div class="footer__brand">
           <div class="navbar__logo" style="font-size:18px;">
-            <div class="navbar__logo-icon" aria-hidden="true">G</div>
-            GRN Digital Solutions
+            <img
+              src="./img-site/grn_digital.png"
+              alt="GRN Digital Solutions"
+              width="120"
+              height="40"
+              style="object-fit:contain;"
+              loading="lazy"
+            />
           </div>
           <p>Desenvolvemos sistemas, aplicativos, plataformas e automações sob medida para empresas e empreendedores que precisam de soluções digitais reais e escaláveis.</p>
         </div>
@@ -2488,15 +2492,13 @@
       </div>
 
       <div class="footer__bottom">
-        <p class="footer__copy">© 2024 <a href="#inicio">GRN Digital Solutions</a>. Todos os direitos reservados.</p>
+        <p class="footer__copy">© 2026 <a href="#inicio">GRN Digital Solutions</a>. Todos os direitos reservados.</p>
         <p class="footer__copy">Desenvolvendo soluções digitais sob medida.</p>
       </div>
     </div>
   </footer>
 
-  <!-- ======================================
-       WHATSAPP FLOAT
-  ====================================== -->
+  <!-- WHATSAPP FLOAT -->
   <a href="https://wa.me/5541995792310?text=Olá!%20Gostaria%20de%20saber%20mais%20sobre%20os%20serviços%20da%20GRN%20Digital%20Solutions." target="_blank" rel="noopener noreferrer" class="wa-float" aria-label="Falar pelo WhatsApp" title="Falar pelo WhatsApp">
     <span class="wa-float__label">Falar pelo WhatsApp</span>
     <div class="wa-float__btn">
@@ -2504,22 +2506,17 @@
     </div>
   </a>
 
-  <!-- ======================================
-       JAVASCRIPT
-  ====================================== -->
+  <!-- JAVASCRIPT -->
   <script>
     // ---- NAVBAR SCROLL ----
     const navbar = document.getElementById('navbar');
-    let lastScroll = 0;
 
     window.addEventListener('scroll', () => {
-      const currentScroll = window.pageYOffset;
-      if (currentScroll > 50) {
+      if (window.pageYOffset > 50) {
         navbar.classList.add('scrolled');
       } else {
         navbar.classList.remove('scrolled');
       }
-      lastScroll = currentScroll;
     }, { passive: true });
 
     // ---- MOBILE MENU ----
@@ -2568,13 +2565,11 @@
         const item = btn.closest('.faq-item');
         const isOpen = item.classList.contains('open');
 
-        // Close all
         document.querySelectorAll('.faq-item').forEach(i => {
           i.classList.remove('open');
           i.querySelector('.faq-item__q').setAttribute('aria-expanded', 'false');
         });
 
-        // Open clicked if it was closed
         if (!isOpen) {
           item.classList.add('open');
           btn.setAttribute('aria-expanded', 'true');
@@ -2586,42 +2581,29 @@
     document.getElementById('contactForm').addEventListener('submit', function(e) {
       e.preventDefault();
 
-      const nome     = document.getElementById('nome').value.trim();
-      const empresa  = document.getElementById('empresa').value.trim();
-      const whatsapp = document.getElementById('whatsapp').value.trim();
-      const email    = document.getElementById('email').value.trim();
-      const tipo     = document.getElementById('tipo').value;
+      const nome      = document.getElementById('nome').value.trim();
+      const empresa   = document.getElementById('empresa').value.trim();
+      const whatsapp  = document.getElementById('whatsapp').value.trim();
+      const email     = document.getElementById('email').value.trim();
+      const tipo      = document.getElementById('tipo').value;
       const descricao = document.getElementById('descricao').value.trim();
 
-      // Validation
-      if (!nome) { alert('Por favor, informe seu nome.'); return; }
-      if (!whatsapp) { alert('Por favor, informe seu WhatsApp.'); return; }
-      if (!tipo) { alert('Por favor, selecione o tipo de projeto.'); return; }
+      if (!nome)      { alert('Por favor, informe seu nome.'); return; }
+      if (!whatsapp)  { alert('Por favor, informe seu WhatsApp.'); return; }
+      if (!tipo)      { alert('Por favor, selecione o tipo de projeto.'); return; }
       if (!descricao) { alert('Por favor, descreva seu projeto.'); return; }
 
-      const msg = `Olá! Gostaria de solicitar uma análise de projeto.
+      const msg = `Olá! Gostaria de solicitar uma análise de projeto.\n\n*Nome:* ${nome}\n*Empresa:* ${empresa || 'Não informado'}\n*WhatsApp:* ${whatsapp}\n*E-mail:* ${email || 'Não informado'}\n*Tipo de Projeto:* ${tipo}\n\n*Descrição:*\n${descricao}`;
 
-*Nome:* ${nome}
-*Empresa:* ${empresa || 'Não informado'}
-*WhatsApp:* ${whatsapp}
-*E-mail:* ${email || 'Não informado'}
-*Tipo de Projeto:* ${tipo}
-
-*Descrição:*
-${descricao}`;
-
-      const encoded = encodeURIComponent(msg);
-      window.open(`https://wa.me/5541995792310?text=${encoded}`, '_blank', 'noopener,noreferrer');
+      window.open(`https://wa.me/5541995792310?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
     });
 
-    // ---- SERVICE CARD MOUSE GLOW EFFECT ----
+    // ---- SERVICE CARD MOUSE GLOW ----
     document.querySelectorAll('.service-card').forEach(card => {
       card.addEventListener('mousemove', (e) => {
         const rect = card.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 100;
-        const y = ((e.clientY - rect.top) / rect.height) * 100;
-        card.style.setProperty('--mx', `${x}%`);
-        card.style.setProperty('--my', `${y}%`);
+        card.style.setProperty('--mx', `${((e.clientX - rect.left) / rect.width) * 100}%`);
+        card.style.setProperty('--my', `${((e.clientY - rect.top) / rect.height) * 100}%`);
       });
     });
 
